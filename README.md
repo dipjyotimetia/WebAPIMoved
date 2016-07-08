@@ -105,3 +105,139 @@ public class EmployeesController : ApiController
 	}
 }
 ```
+
+## Choosing Configuration over Convention
+```cs
+public class EmployeesController : ApiController
+{
+	private static IList<Employee> list = new List<Employee>()
+	{
+		new Employee()
+		{
+			Id = 12345, FirstName = "John", LastName = "Human"
+		},
+		new Employee()
+		{
+			Id = 12346, FirstName = "Jane", LastName = "Public"
+		},
+		new Employee()
+		{
+			Id = 12347, FirstName = "Joseph", LastName = "Law"
+		}
+	};
+	// Following action methods are commented out
+	
+	[AcceptVerbs("GET")]
+	public Employee RetrieveEmployeeById(int id)
+	{
+		return list.First(e => e.Id == id);
+	}
+	
+	[HttpGet]
+	public Employee RetrieveEmployeeById(int id)
+	{
+		return list.First(e => e.Id == id);
+	}
+}
+
+```
+## WebApiConfig Class with RPC-style Mapping Removed
+```cs
+public static class WebApiConfig
+{
+	public static void Register(HttpConfiguration config)
+	{
+		config.Routes.MapHttpRoute(
+			name: "RpcApi",
+			routeTemplate: "api/{controller}/{action}/{id}",
+			defaults: new { id = RouteParameter.Optional }
+		);
+		
+		config.Routes.MapHttpRoute(
+			name: "DefaultApi",
+			routeTemplate: "api/{controller}/{id}",
+			defaults: new { id = RouteParameter.Optional }
+		);
+	}
+}
+```
+
+## Adding a constraint
+```cs
+//Works: http://localhost:55778/api/123/employees/12345
+//Doesn't Works: http://localhost:55778/api/abc/employees/12345
+//by adding a new {orgid} variable and adding a constraint, we have made sure the URI must include a new URI segment immediately after api and that it must be a number.
+config.Routes.MapHttpRoute(
+	name: "DefaultApi",
+	routeTemplate: "api/{orgid}/{controller}/{id}",
+	defaults: new { id = RouteParameter.Optional },
+	constraints: new { orgid = @"\d+" }
+);
+```
+
+
+## Retrieval of Employees by Department
+```cs
+//http://localhost:55778/api/employees?department=2
+public IEnumerable<Employee> GetByDepartment(int department)
+{
+	int[] validDepartments = {1, 2, 3, 5, 8, 13};
+	if (!validDepartments.Any(d => d == department))
+	{
+		var response = new HttpResponseMessage()
+		{
+			StatusCode = (HttpStatusCode)422, // Unprocessable Entity
+			ReasonPhrase = "Invalid Department"
+		};
+		throw new HttpResponseException(response);
+	}
+	return list.Where(e => e.Department == department);
+}
+```
+
+
+
+## It is possible to apply multiple conditions based on parameters. 
+```cs
+http://localhost:port/api/employees?department=2&lastname=Smith
+
+
+Listing 1-21. Retrieving an Employee by Applying Two Conditions
+public IEnumerable<Employee> Get([FromUri]Filter filter)
+{
+	return list.Where(e => e.Department == filter.Department &&
+	e.LastName == filter.LastName);
+}
+
+//Create a class named Filter, under the Models folder.
+public class Filter
+{
+	public int Department { get; set; }
+	public string LastName { get; set; }
+}
+```
+
+
+## Creating a Resource with a Server-Generated Identifier
+```cs
+//Creating an Employee using HTTP POST
+public HttpResponseMessage Post(Employee employee)
+{
+	int maxId = list.Max(e => e.Id);
+	employee.Id = maxId + 1;
+	list.Add(employee);
+	
+	var response = Request.CreateResponse<Employee>(HttpStatusCode.Created, employee);
+	
+	string uri = Url.Link("DefaultApi", new { id = employee.Id });
+	response.Headers.Location = new Uri(uri);
+	
+	return response;
+}
+
+//Output: Response Status Code and Headers
+HTTP/1.1 201 Created
+Date: Mon, 26 Mar 2013 07:35:07 GMT
+Location: http://localhost:55778/api/employees/12348
+Content-Type: application/json; charset=utf-8
+```
