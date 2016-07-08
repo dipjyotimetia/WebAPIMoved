@@ -241,3 +241,75 @@ Date: Mon, 26 Mar 2013 07:35:07 GMT
 Location: http://localhost:55778/api/employees/12348
 Content-Type: application/json; charset=utf-8
 ```
+
+
+## Creating a Resource with a Client-Supplied Identifier
+
+//A resource such as an employee can be created by an HTTP PUT to the URI http://localhost:port/api/ employees/12348, 
+//where the employee with an ID of 12348 does not exist until this PUT request is processed.
+//In this case, the request body contains the JSON/XML representation of the resource being added, which is the new employee.
+
+```cs
+Creating an Employee using HTTP PUT
+public HttpResponseMessage Put(int id, Employee employee)
+{
+	if (!list.Any(e => e.Id == id))
+	{
+		list.Add(employee);
+		var response = Request.CreateResponse<Employee>(HttpStatusCode.Created, employee);
+		
+		string uri = Url.Link("DefaultApi", new { id = employee.Id });
+		response.Headers.Location = new Uri(uri);
+		return response;
+	}
+	return Request.CreateResponse(HttpStatusCode.NoContent);
+}
+```
+
+## Overwriting a Resource
+//A resource can be overwritten using HTTP PUT. This operation is generally considered the same as updating the resource, but there is a difference.
+```cs
+public HttpResponseMessage Put(int id, Employee employee)
+{
+	int index = list.ToList().FindIndex(e => e.Id == id);
+	if (index >= 0)
+	{
+		list[index] = employee; // overwrite the existing resource
+		return Request.CreateResponse(HttpStatusCode.NoContent);
+	}
+	else
+	{
+		list.Add(employee);
+		var response = Request.CreateResponse<Employee>
+		(HttpStatusCode.Created, employee);
+		string uri = Url.Link("DefaultApi", new { id = employee.Id });
+		response.Headers.Location = new Uri(uri);
+		return response;
+	}
+}
+```
+
+## Updating a Resource
+//A resource such as an employee in our example can be updated by an HTTP POST to the URI
+//http://server/api/employees/12345, where the employee with an ID of 12345 already exists in the system.
+```cs
+public HttpResponseMessage Post(int id, Employee employee)
+{
+	int index = list.ToList().FindIndex(e => e.Id == id);
+	if (index >= 0)
+	{
+		list[index] = employee;
+		return Request.CreateResponse(HttpStatusCode.NoContent);
+	}
+	return Request.CreateResponse(HttpStatusCode.NotFound);
+}
+```
+
+## Deleting a Resource
+```cs
+public void Delete(int id)
+{
+	Employee employee = Get(id);
+	list.Remove(employee);
+}
+```
