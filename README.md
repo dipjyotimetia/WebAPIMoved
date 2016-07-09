@@ -376,3 +376,74 @@ public void Delete(int id)
 	list.Remove(employee);
 }
 ```
+
+
+
+
+## Controller
+```cs
+### Returning a Response Message
+public class CarsController : ApiController {
+	public HttpResponseMessage DeleteCar(int id) {
+		//Check here if the resource exists
+		if (id != 1) {
+			return new HttpResponseMessage(HttpStatusCode.NotFound);
+		}
+		
+		//Delete the car object here
+		var response = new HttpResponseMessage(HttpStatusCode.OK);
+		return response;
+	}
+}
+
+## PostCar Controller Action That Returns an HttpResponseMessage Instance with an Object
+public class CarsController : ApiController {
+	public HttpResponseMessage GetCars() {
+		var cars = new string[] {
+			"Car 1",
+			"Car 2",
+			"Car 3"
+		};
+	HttpResponseMessage response = 	Request.CreateResponse<string[]>(HttpStatusCode.OK, cars);
+	response.Headers.Add("X-Foo", "Bar");
+	return response;
+	}
+}
+
+## A Sample Controller Action That Throws HttpResponseException
+public class CarsController : ApiController {
+	
+	public string[] GetCars() {
+		try {
+			int left = 10,
+			right = 0;
+			var result = left / right;
+		}
+		catch (DivideByZeroException ex) {
+			var faultedResponse = Request.CreateResponse(HttpStatusCode.InternalServerError, new HttpError(ex, includeErrorDetail: true));
+			
+			throw new HttpResponseException(faultedResponse);
+		}
+			return new[] {
+			"Car 1",
+			"Car 2",
+			"Car 3"
+			};
+	}
+
+}
+```
+
+```cs
+## Our Web API Route Registration
+protected void Application_Start(object sender, EventArgs e) {
+	var config = GlobalConfiguration.Configuration;
+	var routes = config.Routes;
+	
+	routes.MapHttpRoute(
+		"DefaultHttpRoute",
+		"api/{controller}/{id}",
+		new { id = RouteParameter.Optional }
+		);
+}
+```
