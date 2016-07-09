@@ -162,6 +162,68 @@ public static class WebApiConfig
 }
 ```
 
+
+## Routing
+```cs
+public static class WebApiConfig
+{
+    public static void Register(HttpConfiguration config)
+    {
+		config.Routes.MapHttpRoute(
+			name: "DefaultApi",
+			routeTemplate: "api/{controller}/{id}",
+			defaults: new { id = RouteParameter.Optional });
+ 
+		config.Routes.MapHttpRoute( 
+			name: "PostByDate", 
+			routeTemplate: "api/Posts/{year}/{month}/{day}", 
+			defaults: new { controller = "Posts", month = RouteParameter.Optional, day = RouteParameter.Optional } );
+ 
+		config.Routes.MapHttpRoute( 
+			name: "PostByDate", 
+			routeTemplate: "api/{controller}/{year}/{month}/{day}", 
+			defaults: new { month = RouteParameter.Optional, day = RouteParameter.Optional } ); 
+		
+		config.Routes.MapHttpRoute( 
+			name: "PostByDate", 
+			routeTemplate: "api/Posts/{year}/{month}/{day}", 
+			defaults: new { 
+				controller = "Posts", month = RouteParameter.Optional, day = RouteParameter.Optional 
+				}, 
+			constraints: new { 
+				month = @"\d{0,2}", day = @"\d{0,2}" } 
+				);
+		
+		///api/Posts/Category/10
+		config.Routes.MapHttpRoute( 
+			name: "PostsCustomAction",
+			routeTemplate: "api/{controller}/{action}/{id}", 
+			defaults: new { id = RouteParameter.Optional } );
+		
+
+        config.Routes.MapHttpRoute("product-get", "products/{productId}",
+            new { controller = "Products", action = "GetProduct", logging = false },
+            new { httpMethod = new HttpMethodConstraint("GET") });
+        
+        config.Routes.MapHttpRoute("product-list", "products",
+            new { controller = "Products", action = "GetProducts", logging = false },
+            new { httpMethod = new HttpMethodConstraint("GET") });
+        
+        config.Routes.MapHttpRoute("product-create", "products",
+            new { controller = "Products", action = "PostProduct", logging = true },
+            new { httpMethod = new HttpMethodConstraint("POST") });
+        
+        config.Routes.MapHttpRoute("product-update", "products/{productId}",
+            new { controller = "Products", action = "UpdateProduct", logging = true },
+            new { httpMethod = new HttpMethodConstraint("PUT") });
+        
+        config.Routes.MapHttpRoute("product-delete", "products/{productId}",
+            new { controller = "Products", action = "DeleteProduct", logging = true },
+            new { httpMethod = new HttpMethodConstraint("DELETE") });
+    }
+}
+```
+
 ## Adding a constraint
 ```cs
 //Works: http://localhost:55778/api/123/employees/12345
