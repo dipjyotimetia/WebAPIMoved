@@ -136,6 +136,13 @@ public static class WebApiConfig
 			defaults: new { id = RouteParameter.Optional }
 		);
 		
+		//RPC-style
+		config.Routes.MapHttpRoute(
+            		name: "RpcApi",
+            		routeTemplate: "api/{controller}/{action}/{id}",
+            		defaults: new { id = RouteParameter.Optional }
+        	);
+        
 	    // Matches route with the taskNum parameter
 		config.Routes.MapHttpRoute(
 			name: "FindByTaskNumberRoute",
