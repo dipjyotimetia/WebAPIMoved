@@ -202,6 +202,14 @@ public static class WebApiConfig
 			defaults: new { id = RouteParameter.Optional } );
 		
 
+	config.Routes.MapHttpRoute(
+            name: "DefaultApi",
+            routeTemplate: "api/{controller}/{id}",
+            defaults: new { id = RouteParameter.Optional },
+            constraints: null,
+            handler: new CustomHttpControllerDispatcher(config)
+        );
+		
         config.Routes.MapHttpRoute("product-get", "products/{productId}",
             new { controller = "Products", action = "GetProduct", logging = false },
             new { httpMethod = new HttpMethodConstraint("GET") });
@@ -377,7 +385,48 @@ public void Delete(int id)
 }
 ```
 
+## Action
+```cs
+public class RsvpController : ApiController {
+	[HttpGet]
+	public IEnumerable<GuestResponse> Attendees() {
+		return Repository.Responses.Where(x => x.WillAttend == true);
+	}
+	
+	[HttpPost]
+	public void Add(GuestResponse response) {
+		if (ModelState.IsValid) {
+		Repository.Add(response);
+		}
+	}
+	
+	//Adding an Action Method
+	[HttpGet]
+	[Route("api/products/noop")]
+	public IHttpActionResult NoOp() {
+		return Ok();
+	}
+	
+	//Using a StatusCodeResult
+	public IHttpActionResult Delete(int id) {
+		repo.DeleteProduct(id);
+		return StatusCode(HttpStatusCode.NoContent);
+	}
+	
+	//Using the ResponseMessage Method
+	public IHttpActionResult Delete(int id) {
+		repo.DeleteProduct(id);
+		return ResponseMessage(new HttpResponseMessage(HttpStatusCode.NoContent));
+	}
+	
+	//Using a Custom Action Method
+	public IHttpActionResult Delete(int id) {
+		repo.DeleteProduct(id);
+		return new MyNoContentResult();
+	}
+}		
 
+```
 
 
 ## Controller
@@ -433,6 +482,37 @@ public class CarsController : ApiController {
 
 }
 ```
+
+## DataAnnotations
+```cs
+using System.ComponentModel.DataAnnotations;
+namespace PartyInvites.Models {
+	public class GuestResponse {
+		[HttpBindNever]
+		public int Id { get; set; }
+		[Required]
+		public string Name { get; set; }
+		[Required]
+		public string Email { get; set; }
+		[Required]
+		[Range(1, 100000)]
+		public decimal Price { get; set; }
+		[Required]
+		public bool? WillAttend { get; set; }
+	}
+}
+
+```
+
+## Secure
+```cs
+//Applying Authorization in the ProductsController.cs File
+[Authorize(Roles = "Administrators")]
+public async Task DeleteProduct(int id) {
+	await Repository.DeleteProductAsync(id);
+}
+```
+
 
 ```cs
 ## Our Web API Route Registration
