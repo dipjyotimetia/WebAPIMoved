@@ -36,12 +36,9 @@
 ## API Documentation
 
 
-```cs
 
-```
-
+## Getting an Employee the WCF Way
 ```cs
-//Getting an Employee the WCF Way
 [ServiceContract]
 public interface IEmployeeService
 {
@@ -69,13 +66,10 @@ public class Employee
 	
 	// other members
 }
-
-
 ```
 
-
+## Getting an Employee the ASP.NET Web API Way
 ```cs
-//Getting an Employee the ASP.NET Web API Way/
 public class EmployeeController : ApiController
 {
 	public Employee Get(string id)
@@ -84,6 +78,9 @@ public class EmployeeController : ApiController
 	}
 }
 ```
+
+
+
 
 
 
