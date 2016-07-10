@@ -714,3 +714,62 @@ public static class WebApiConfig {
 	}
 }
 ```
+
+## Understanding Parameter and Model Binding
+
+```cs
+[HttpGet]
+[HttpPost]
+public int SumNumbers(int first, int second) {
+	return first + second;
+}
+
+//Using a Model Class - Refer: Numbers.cs
+[HttpGet]
+[HttpPost]
+public int SumNumbers(Numbers calc) {
+	return calc.First + calc.Second;
+}
+
+//Adding an Action Method Parameter - refer: Operation.cs
+[HttpGet]
+[HttpPost]
+public int SumNumbers(Numbers calc, Operation op) {
+	int result = op.Add ? calc.First + calc.Second : calc.First - calc.Second;
+	return op.Double ? result * 2 : result;
+}
+
+//Getting Values for a Complex Type from the Request URL
+[HttpGet]
+[HttpPost]
+public int SumNumbers([FromUri] Numbers calc, [FromUri] Operation op) {
+	int result = op.Add ? calc.First + calc.Second : calc.First - calc.Second;
+	return op.Double ? result * 2 : result;
+}
+
+//Using the FromBody Attribute
+[HttpGet]
+[HttpPost]
+public int SumNumbers([FromBody] int number) {
+	return number * 2;
+}
+
+
+//Defining a Binding Rule in the WebApiConfig.cs File
+config.ParameterBindingRules.Insert(0, typeof(Numbers), x => x.BindWithAttribute(new FromUriAttribute()));
+
+
+
+
+Numbers.cs
+public class Numbers {
+	public int First { get; set; }
+	public int Second { get; set; }
+}
+
+Operation.cs
+public class Operation {
+	public bool Add { get; set; }
+	public bool Double { get; set; }
+}
+```
