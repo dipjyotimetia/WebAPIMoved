@@ -138,9 +138,131 @@ public class EmployeesController : ApiController
 	{
 		return list.First(e => e.Id == id);
 	}
+	
+	
+//Defining Direct Routes
+[HttpGet]
+[Route("api/today/dayofweek")]
+public string DayOfWeek() {
+	return DateTime.Now.ToString("dddd");
+}
+
+//Defining Direct Routes
+[HttpGet]
+[Route("api/today/dayofweek/{day}")]
+public string DayOfWeek(int day) {
+	return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+}
+
+//To prevent the prefix from being applied
+[HttpGet]
+[Route("~/getdaynumber")]
+public int DayNumber() {
+	return DateTime.Now.Day;
+}
+
+//Defining an Optional Segment
+[HttpGet]
+[Route("dayofweek/{day?}")]
+public string DayOfWeek(int day = -1) {	//set a default value on the action method parameter
+	if (day != -1) {
+		return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+	} else {
+		return DateTime.Now.ToString("dddd");
+	}
+}
+
+//Handling an Optional Segment
+[HttpGet]
+[Route("dayofweek/{day?}")]
+public IHttpActionResult DayOfWeek(int day = -1) {
+	if (RequestContext.RouteData.Values.ContainsKey("day")) {
+		return day != -1 	? Ok(Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString()) 	: (IHttpActionResult)BadRequest("Value Out of Range");
+	} else {
+		return Ok(DateTime.Now.ToString("dddd"));
+	}
+}
+
+//Defining a Default Segment Value
+[Route("dayofweek/{day=-1}")]
+public string DayOfWeek(int day) {
+	if (day != -1) {
+		return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+	} else {
+		return DateTime.Now.ToString("dddd");
+	}
+}
+
+//Applying a Constraint to a Direct Route
+[HttpGet]
+[Route("dayofweek/{day:int=-1}")]
+public string DayOfWeek(int day) {
+	if (day != -1) {
+		return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+	} else {
+		return DateTime.Now.ToString("dddd");
+	}
+}
+
+[HttpGet]
+[Route("dayofweek")]
+public string DayOfWeek() {
+	return DateTime.Now.ToString("dddd");
+}
+
+[HttpGet]
+[Route("dayofweek/{day:range(0, 6)}")]
+public string DayOfWeek(int day) {
+	return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+}
+
+//Applying the Order Property to the Route Attribute
+[HttpGet]
+[Route("~/getdaynumber", Order=1)]
+public int DayNumber() {
+	return DateTime.Now.Day;
+}
+
+Specifying HTTP Verbs
+[AcceptVerbs("GET", "HEAD")]
+public string DayOfWeek() {
+	return DateTime.Now.ToString("dddd");
+}
+
+
 }
 
 ```
+
+## Controller
+```cs
+//Defining a Common Prefix
+[RoutePrefix("api/today")]
+public class TodayController : ApiController {
+}
+
+//Applying the Route Attribute to the Controller
+[Route("{action=DayOfWeek}")]
+public class TodayController : ApiController {
+}
+
+//Consolidating the Direct Routes
+[Route("{action=DayOfWeek}/{day:range(0, 6)}")]
+public class TodayController : ApiController {
+}
+
+//Using a Custom Route Attribute
+[UserAgentConstraintRoute("{action=DayOfWeek}/{day:specval(2)}")]
+public class TodayController : ApiController {
+}
+
+//Applying the CustomControllerConfigAttribute
+[CustomControllerConfig]
+public class CustomController : ApiController {
+}
+
+```
+
 ## WebApiConfig Class with RPC-style Mapping Removed
 ```cs
 public static class WebApiConfig
@@ -230,6 +352,32 @@ public static class WebApiConfig
             new { controller = "Products", action = "DeleteProduct", logging = true },
             new { httpMethod = new HttpMethodConstraint("DELETE") });
     }
+    
+	  //Using a Built-in Constraint
+	using System.Web.Http.Routing.Constraints;
+	
+	config.Routes.MapHttpRoute(
+		name: "ChromeRoute",
+		routeTemplate: "api/today/{action}",
+		defaults: new { controller = "today" },
+		constraints: new {
+			useragent = new UserAgentConstraint("Chrome"),
+			action = new RegexRouteConstraint("daynumber|othermethod")
+		}
+	);
+	
+	//Defining a Route with Data Tokens
+	config.Routes.Add(
+		"CustomHandler",
+		config.Routes.CreateRoute(
+		routeTemplate: "api/{controller}/{action}",
+		defaults: null,
+		constraints: null,
+		dataTokens: new Dictionary<string, object> {
+		{ "response", "Tomorrow" }
+		},
+		handler: new CustomRouteHandler())
+	);
 }
 ```
 
@@ -787,3 +935,159 @@ public class Operation {
 	public bool Double { get; set; }
 }
 ```
+
+## Error Handling
+```cs
+//Applying the HttpResponseException
+[LogErrors]
+public Product Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+		if (product == null) {
+			throw new HttpResponseException(HttpStatusCode.BadRequest);
+		}
+	return product;
+}
+
+
+//Using an Implementation of the IHttpActionResult Interface
+[LogErrors]
+public IHttpActionResult Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+		if (product == null) {
+			return BadRequest("No such data object");
+		}
+	return Ok(product);
+}
+
+
+//Creating an Error Response
+[LogErrors]
+public HttpResponseMessage Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+	if (product == null) {
+		return Request.CreateErrorResponse(HttpStatusCode.BadRequest, new HttpError {
+			Message = "No such data item",
+			MessageDetail = string.Format("No item ID {0} was found", id)
+		});
+	}
+	return Request.CreateResponse(product);
+}
+
+
+//Adding Extra Error Information
+[LogErrors]
+public HttpResponseMessage Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+	if (product == null) {
+		HttpError error = new HttpError();
+		error.Message = "No such data item";
+		error.Add("RequestID", id);
+		error.Add("AvailbleIDs", products.Select(x => x.ProductID));
+		return Request.CreateErrorResponse(HttpStatusCode.BadRequest, error);
+	}
+	return Request.CreateResponse(product);
+}
+
+//Adding Model State Data to the Error
+public HttpResponseMessage Post(Product product) {
+	if (!ModelState.IsValid) {
+		HttpError error = new HttpError(ModelState, false);
+		error.Message = "Cannot Add Product";
+		error.Add("AvailbleIDs", products.Select(x => x.ProductID));
+		return Request.CreateErrorResponse(HttpStatusCode.BadRequest, error);
+	}
+	product.ProductID = products.Count + 1;
+	products.Add(product);
+
+	return Request.CreateResponse(product);
+}
+
+
+public static class WebApiConfig {
+public static void Register(HttpConfiguration config) {
+	//Setting the Exception Detail Policy
+	config.IncludeErrorDetailPolicy = IncludeErrorDetailPolicy.Never;
+	
+	//Registering a Global Exception Handler
+	config.Services.Replace(typeof(IExceptionHandler), new CustomExceptionHandler());
+	
+	//Registering a Custom Global Exception Logger
+	config.Services.Add(typeof(IExceptionLogger), new CustomExceptionLogger());
+}
+
+
+//Throwing Exceptions
+[LogErrors]
+public Product Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+	if (product == null) {
+		throw new ArgumentOutOfRangeException("id");
+	}
+		return product;
+}
+```
+
+
+## Filter
+```cs
+//Registering a Global Filter in the WebApiConfig.cs File
+public static class WebApiConfig {
+	public static void Register(HttpConfiguration config) {
+		config.Filters.Add(new SayHelloAttribute { Message = "Global Filter" });
+		
+		config.MessageHandlers.Add(new AuthenticationDispatcher());
+	}
+}
+
+//SayHelloAttribute
+using System.Web.Http.Filters;
+namespace Dispatch.Infrastructure {
+	public class SayHelloAttribute : ActionFilterAttribute {
+		public string Message { get; set; }
+		
+		public override Task OnActionExecutingAsync(HttpActionContext actionContext, CancellationToken cancellationToken) {
+			Debug.WriteLine("SayHello: {0}", (object)Message ?? "Hello");
+			return Task.FromResult<object>(null);
+		}
+	}
+}
+
+
+//Appling the Authorization Filter
+namespace Dispatch.Controllers {
+	[Time]
+	public class ProductsController : ApiController {
+
+		[CustomAuthentication]
+		[CustomAuthorization("admins")]
+		public Product Get(int id) {
+			return products.Where(x => x.ProductID == id).FirstOrDefault();
+		}
+	}
+}	
+	
+	
+//Creating an Exception Filter
+public class CustomExceptionAttribute : Attribute, IExceptionFilter {
+	public Task ExecuteExceptionFilterAsync(HttpActionExecutedContext actionExecutedContext, CancellationToken cancellationToken) {
+		if (actionExecutedContext.Exception != null && actionExecutedContext.Exception is ArgumentOutOfRangeException) {
+			actionExecutedContext.Response = actionExecutedContext.Request.CreateErrorResponse( HttpStatusCode.BadRequest, "No data item");
+		}
+	
+		return Task.FromResult<object>(null);
+	}
+
+	public bool AllowMultiple {
+		get { return true; }
+	}
+}
+
+
+[CustomException]
+public Product Get(int id) {
+return products[id];
+//return products.Where(x => x.ProductID == id).FirstOrDefault();
+}
+```
+
+
