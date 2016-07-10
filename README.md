@@ -246,7 +246,151 @@ public class TodayController : ApiController {
 public class CustomController : ApiController {
 }
 ```
+
 ## Actions
+```cs
+public class RsvpController : ApiController {
+	[HttpGet]
+	public IEnumerable<GuestResponse> Attendees() {
+		return Repository.Responses.Where(x => x.WillAttend == true);
+	}
+	
+	[HttpPost]
+	public void Add(GuestResponse response) {
+		if (ModelState.IsValid) {
+		Repository.Add(response);
+		}
+	}
+	
+	//Binding Request Data As an Array
+	[HttpGet]
+	[HttpPost]
+	public string SumNumbers([ModelBinder] int[] numbers) {
+		return numbers.Sum().ToString();
+	}
+	
+	//Binding Request Data As a Strongly Typed Collection
+	[HttpGet]
+	[HttpPost]
+	public string SumNumbers([ModelBinder] List<int> numbers) {
+		return numbers.Sum().ToString();
+	}
+	
+	//Adding an Action Method
+	[HttpGet]
+	[Route("api/products/noop")]
+	public IHttpActionResult NoOp() {
+		return Ok();
+	}
+	
+	//Using a StatusCodeResult
+	public IHttpActionResult Delete(int id) {
+		repo.DeleteProduct(id);
+		return StatusCode(HttpStatusCode.NoContent);
+	}
+	
+	//Using the ResponseMessage Method
+	public IHttpActionResult Delete(int id) {
+		repo.DeleteProduct(id);
+		return ResponseMessage(new HttpResponseMessage(HttpStatusCode.NoContent));
+	}
+	
+	//Using a Custom Action Method
+	public IHttpActionResult Delete(int id) {
+		repo.DeleteProduct(id);
+		return new MyNoContentResult();
+	}
+	
+	//Defining Direct Routes
+	[HttpGet]
+	[Route("api/today/dayofweek")]
+	public string DayOfWeek() {
+		return DateTime.Now.ToString("dddd");
+	}
+
+	//Defining Direct Routes
+	[HttpGet]
+	[Route("api/today/dayofweek/{day}")]
+	public string DayOfWeek(int day) {
+		return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+	}
+
+	//To prevent the prefix from being applied
+	[HttpGet]
+	[Route("~/getdaynumber")]
+	public int DayNumber() {
+		return DateTime.Now.Day;
+	}
+
+	//Defining an Optional Segment
+	[HttpGet]
+	[Route("dayofweek/{day?}")]
+	public string DayOfWeek(int day = -1) {	//set a default value on the action method parameter
+		if (day != -1) {
+			return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+		} else {
+			return DateTime.Now.ToString("dddd");
+		}
+	}
+
+	//Handling an Optional Segment
+	[HttpGet]
+	[Route("dayofweek/{day?}")]
+	public IHttpActionResult DayOfWeek(int day = -1) {
+		if (RequestContext.RouteData.Values.ContainsKey("day")) {
+			return day != -1 	? Ok(Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString()) 	: (IHttpActionResult)BadRequest("Value Out of Range");
+		} else {
+			return Ok(DateTime.Now.ToString("dddd"));
+		}
+	}
+
+	//Defining a Default Segment Value
+	[Route("dayofweek/{day=-1}")]
+	public string DayOfWeek(int day) {
+		if (day != -1) {
+			return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+		} else {
+			return DateTime.Now.ToString("dddd");
+		}
+	}
+
+	//Applying a Constraint to a Direct Route
+	[HttpGet]
+	[Route("dayofweek/{day:int=-1}")]
+	public string DayOfWeek(int day) {
+		if (day != -1) {
+			return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+		} else {
+			return DateTime.Now.ToString("dddd");
+		}
+	}
+
+	[HttpGet]
+	[Route("dayofweek")]
+	public string DayOfWeek() {
+		return DateTime.Now.ToString("dddd");
+	}
+
+	[HttpGet]
+	[Route("dayofweek/{day:range(0, 6)}")]
+	public string DayOfWeek(int day) {
+		return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
+	}
+
+	//Applying the Order Property to the Route Attribute
+	[HttpGet]
+	[Route("~/getdaynumber", Order=1)]
+	public int DayNumber() {
+		return DateTime.Now.Day;
+	}
+
+	//Specifying HTTP Verbs
+	[AcceptVerbs("GET", "HEAD")]
+	public string DayOfWeek() {
+		return DateTime.Now.ToString("dddd");
+	}
+}		
+```
 ## Message Handlers
 ## Filters
 ## Media Type Formatters
