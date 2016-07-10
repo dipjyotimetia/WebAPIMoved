@@ -19,22 +19,6 @@
 * [API Documentation](#api-documentation)
 
 
-## Routing
-## Controllers
-## Actions
-## Message Handlers
-## Filters
-## Media Type Formatters
-## Model Binding
-## Input Validation
-## Dependency Resolution
-## Testing
-## Optimization and Performance
-## Hosting
-## Error Handling
-## Tracing and Logging
-## API Documentation
-
 
 
 ## Getting an Employee the WCF Way
@@ -78,6 +62,25 @@ public class EmployeeController : ApiController
 	}
 }
 ```
+
+## Routing
+## Controllers
+## Actions
+## Message Handlers
+## Filters
+## Media Type Formatters
+## Model Binding
+## Input Validation
+## Dependency Resolution
+## Testing
+## Optimization and Performance
+## Hosting
+## Error Handling
+## Tracing and Logging
+## API Documentation
+
+
+
 
 
 
