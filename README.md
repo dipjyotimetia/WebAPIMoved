@@ -400,6 +400,20 @@ public class RsvpController : ApiController {
 		}
 	}
 	
+	//Binding Request Data As an Array
+	[HttpGet]
+	[HttpPost]
+	public string SumNumbers([ModelBinder] int[] numbers) {
+		return numbers.Sum().ToString();
+	}
+	
+	//Binding Request Data As a Strongly Typed Collection
+	[HttpGet]
+	[HttpPost]
+	public string SumNumbers([ModelBinder] List<int> numbers) {
+		return numbers.Sum().ToString();
+	}
+	
 	//Adding an Action Method
 	[HttpGet]
 	[Route("api/products/noop")]
