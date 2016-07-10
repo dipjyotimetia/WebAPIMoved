@@ -63,8 +63,173 @@ public class EmployeeController : ApiController
 }
 ```
 
+## Simple REST API 
+
+```cs
+public class EmployeesController : ApiController
+{
+	private static IList<Employee> list = new List<Employee>()
+	{
+		new Employee()
+		{
+		Id = 12345, FirstName = "John", LastName = "Human"
+		},
+		new Employee()
+		{
+		Id = 12346, FirstName = "Jane", LastName = "Public"
+		},
+		new Employee()
+		{
+		Id = 12347, FirstName = "Joseph", LastName = "Law"
+		}
+	};
+	
+	// GET api/employees
+	public IEnumerable<Employee> Get()
+	{
+		return list;
+	}
+	
+	// GET api/employees/12345
+	public Employee Get(int id)
+	{
+		return list.First(e => e.Id == id);
+	}
+
+	// POST api/employees
+	public void Post(Employee employee)
+	{
+		int maxId = list.Max(e => e.Id);
+		employee.Id = maxId + 1;
+		list.Add(employee);
+	}
+	
+	// PUT api/employees/12345
+	public void Put(int id, Employee employee)
+	{
+		int index = list.ToList().FindIndex(e => e.Id == id);
+		list[index] = employee;
+	}
+	
+	// DELETE api/employees/12345
+	public void Delete(int id)
+	{
+		Employee employee = Get(id);
+		list.Remove(employee);
+	}
+}
+```
+
+
 ## Routing
+```cs
+// WebApiConfig.cs
+public static class WebApiConfig
+{
+	public static void Register(HttpConfiguration config)
+	{
+	
+		// Default catch-all
+		config.Routes.MapHttpRoute(
+			name: "DefaultApi",
+			routeTemplate: "api/{controller}/{id}",
+			defaults: new { id = RouteParameter.Optional }
+		);
+		
+	    // Matches route with the taskNum parameter
+		config.Routes.MapHttpRoute(
+			name: "FindByTaskNumberRoute",
+			routeTemplate: "api/{controller}/{taskNum}",
+			defaults: new { taskNum = RouteParameter.Optional }
+		);
+	
+		config.Routes.MapHttpRoute( 
+			name: "PostByDate", 
+			routeTemplate: "api/Posts/{year}/{month}/{day}", 
+			defaults: new { controller = "Posts", month = RouteParameter.Optional, day = RouteParameter.Optional } );
+		
+		config.Routes.MapHttpRoute( 
+			name: "PostByDate", 
+			routeTemplate: "api/Posts/{year}/{month}/{day}", 
+			defaults: new { 
+				controller = "Posts", month = RouteParameter.Optional, day = RouteParameter.Optional}, 
+			constraints: new { 
+				month = @"\d{0,2}", day = @"\d{0,2}" } 
+				);
+				
+		//Using a Built-in Constraint
+		//Add - using System.Web.Http.Routing.Constraints;
+		config.Routes.MapHttpRoute(
+			name: "ChromeRoute",
+			routeTemplate: "api/today/{action}",
+			defaults: new { controller = "today" },
+			constraints: new {
+				useragent = new UserAgentConstraint("Chrome"),
+				action = new RegexRouteConstraint("daynumber|othermethod")
+			}
+		);		
+		
+		//api/Posts/Category/10
+		config.Routes.MapHttpRoute( 
+			name: "PostsCustomAction",
+			routeTemplate: "api/{controller}/{action}/{id}", 
+			defaults: new { id = RouteParameter.Optional } );
+		
+
+		config.Routes.MapHttpRoute(
+            name: "DefaultApi",
+            routeTemplate: "api/{controller}/{id}",
+            defaults: new { id = RouteParameter.Optional },
+            constraints: null,
+            handler: new CustomHttpControllerDispatcher(config)
+        );
+
+		//Defining a Route with Data Tokens
+		config.Routes.Add(
+			"CustomHandler",
+			config.Routes.CreateRoute(
+			routeTemplate: "api/{controller}/{action}",
+			defaults: null,
+			constraints: null,
+			dataTokens: new Dictionary<string, object> {
+			{ "response", "Tomorrow" }
+			},
+			handler: new CustomRouteHandler())
+		);
+	
+        config.Routes.MapHttpRoute("product-delete", "products/{productId}",
+            new { controller = "Products", action = "DeleteProduct", logging = true },
+            new { httpMethod = new HttpMethodConstraint("DELETE") });
+    }
+}
+```
 ## Controllers
+```cs
+//Defining a Common Prefix
+[RoutePrefix("api/today")]
+public class TodayController : ApiController {
+}
+
+//Applying the Route Attribute to the Controller
+[Route("{action=DayOfWeek}")]
+public class TodayController : ApiController {
+}
+
+//Consolidating the Direct Routes
+[Route("{action=DayOfWeek}/{day:range(0, 6)}")]
+public class TodayController : ApiController {
+}
+
+//Using a Custom Route Attribute
+[UserAgentConstraintRoute("{action=DayOfWeek}/{day:specval(2)}")]
+public class TodayController : ApiController {
+}
+
+//Applying the CustomControllerConfigAttribute
+[CustomControllerConfig]
+public class CustomController : ApiController {
+}
+```
 ## Actions
 ## Message Handlers
 ## Filters
