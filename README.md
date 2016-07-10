@@ -290,8 +290,22 @@ public static class WebApiConfig
 // WebApiConfig.cs
 public static class WebApiConfig
 {
-    public static void Register(HttpConfiguration config)
-    {
+	    public static void Register(HttpConfiguration config)
+	    {
+	    // Matches route with the taskNum parameter
+	config.Routes.MapHttpRoute(
+		name: "FindByTaskNumberRoute",
+		routeTemplate: "api/{controller}/{taskNum}",
+		defaults: new { taskNum = RouteParameter.Optional }
+	);
+	
+	// Default catch-all
+	config.Routes.MapHttpRoute(
+		name: "DefaultApi",
+		routeTemplate: "api/{controller}/{id}",
+		defaults: new { id = RouteParameter.Optional }
+	);
+
 		config.Routes.MapHttpRoute(
 			name: "DefaultApi",
 			routeTemplate: "api/{controller}/{id}",
