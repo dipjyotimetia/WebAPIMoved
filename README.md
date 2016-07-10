@@ -673,3 +673,44 @@ public static class WebApiConfig {
 
 }
 ```
+
+
+## Changing the Order of the Media Type Formatters
+```cs
+public static class WebApiConfig {
+	public static void Register(HttpConfiguration config) {
+		MediaTypeFormatter xmlFormatter = config.Formatters.XmlFormatter;
+		config.Formatters.Remove(xmlFormatter);
+		config.Formatters.Insert(0, xmlFormatter);
+	}
+}
+```
+
+
+## Disabling the Match-on-Type Feature
+```cs
+public static class WebApiConfig {
+	public static void Register(HttpConfiguration config) {
+		config.Services.Replace(typeof(IContentNegotiator),	new DefaultContentNegotiator(true));
+	}
+}
+```
+
+### Indenting the JSON Data
+```cs
+public static class WebApiConfig {
+	public static void Register(HttpConfiguration config) {
+		JsonMediaTypeFormatter jsonFormatter = config.Formatters.JsonFormatter;
+		jsonFormatter.Indent = true;
+		
+		//Enabling the Microsoft Date Format
+		jsonFormatter.SerializerSettings.DateFormatHandling = DateFormatHandling.MicrosoftDateFormat;
+		
+		//Enabling HTML Character Escaping
+		jsonFormatter.SerializerSettings.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
+		
+		//Ignoring Default Values
+		jsonFormatter.SerializerSettings.DefaultValueHandling = DefaultValueHandling.Ignore;
+	}
+}
+```
