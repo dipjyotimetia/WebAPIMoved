@@ -394,7 +394,194 @@ public class RsvpController : ApiController {
 ## Message Handlers
 ## Filters
 ## Media Type Formatters
+//Product.cs
+//Creating a CSV Media Formatter
+```cs
+public class Product
+{
+	public int Id { get; set; }
+	public string Name { get; set; }
+	public string Category { get; set; }
+	public decimal Price { get; set; }
+}
+```
+
+
+//ProductCsvFormatter.cs
+```cs
+public class ProductCsvFormatter : BufferedMediaTypeFormatter
+{
+	public ProductCsvFormatter()
+	{
+		// Add the supported media type.
+		SupportedMediaTypes.Add(new MediaTypeHeaderValue("text/csv"));
+		
+		//Another example
+		SupportedMediaTypes.Add(new MediaTypeHeaderValue("application/x.product"));
+		
+		//Supporting a Specific Encoding
+		SupportedEncodings.Add(new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+		SupportedEncodings.Add(Encoding.GetEncoding("iso-8859-1"));
+		
+		//Using a MediaTypeMapping
+		MediaTypeMappings.Add(new ProductMediaMapping());
+	}
+	
+	public override bool CanWriteType(System.Type type)
+	{
+		if (type == typeof(Product))
+		{
+			return true;
+		}
+		else
+		{
+			Type enumerableType = typeof(IEnumerable<Product>);
+			return enumerableType.IsAssignableFrom(type);
+		}
+	}
+
+	public override bool CanReadType(Type type)
+	{
+		return false;
+	}
+
+	public override void WriteToStream(Type type, object value, Stream writeStream, HttpContent content)
+	{
+		using (var writer = new StreamWriter(writeStream))
+		{
+			var products = value as IEnumerable<Product>;
+			if (products != null)
+			{
+				foreach (var product in products)
+				{
+					WriteItem(product, writer);
+				}
+			}
+			else
+			{
+				var singleProduct = value as Product;
+				if (singleProduct == null)
+				{
+					throw new InvalidOperationException("Cannot serialize type");
+				}
+				WriteItem(singleProduct, writer);
+			}
+		}
+	}
+
+	//Setting the HTTP Response Headers
+	public override void SetDefaultContentHeaders(Type type, 	HttpContentHeaders headers, MediaTypeHeaderValue mediaType) {
+		base.SetDefaultContentHeaders(type, headers, mediaType);
+			headers.Add("X-ModelType", 	type == typeof(IEnumerable<Product>) ? "IEnumerable<Product>" : "Product");
+			headers.Add("X-MediaType", mediaType.MediaType);
+	}
+
+	// Helper methods for serializing Products to CSV format. 
+	private void WriteItem(Product product, StreamWriter writer)
+	{
+		writer.WriteLine("{0},{1},{2},{3}", Escape(product.Id),
+			Escape(product.Name), Escape(product.Category), Escape(product.Price));
+	}
+
+	static char[] _specialChars = new char[] { ',', '\n', '\r', '"' };
+
+	private string Escape(object o)
+	{
+		if (o == null)
+		{
+			return "";
+		}
+		string field = o.ToString();
+		if (field.IndexOfAny(_specialChars) != -1)
+		{
+			// Delimit the entire field with quotes and replace embedded quotes with "".
+			return String.Format("\"{0}\"", field.Replace("\"", "\"\""));
+		}
+		else return field;
+	}
+}
+
+
+```
+
+```cs
+//Creating a Media Type Mapping
+//ProductMediaMapping.cs
+public class ProductMediaMapping : MediaTypeMapping {
+	public ProductMediaMapping() : base("application/x.product") {
+	}
+	
+	public override double TryMatchMediaType(HttpRequestMessage request) {
+		IEnumerable<string> values;
+		return request.Headers.TryGetValues("X-UseProductFormat", out values) && values.Where(x => x == "true").Count() > 0 ? 1 : 0;
+	}
+}
+```
+
+### Changing the Order of the Media Type Formatters
+```cs
+public static class WebApiConfig {
+	public static void Register(HttpConfiguration config) {
+		MediaTypeFormatter xmlFormatter = config.Formatters.XmlFormatter;
+		config.Formatters.Remove(xmlFormatter);
+		config.Formatters.Insert(0, xmlFormatter);
+	}
+}
+```
+
+
+
+### Disabling the Match-on-Type Feature
+```cs
+public static class WebApiConfig {
+	public static void Register(HttpConfiguration config) {
+		config.Services.Replace(typeof(IContentNegotiator),	new DefaultContentNegotiator(true));
+	}
+}
+```
+
+### Indenting the JSON Data
+```cs
+public static class WebApiConfig {
+	public static void Register(HttpConfiguration config) {
+		JsonMediaTypeFormatter jsonFormatter = config.Formatters.JsonFormatter;
+		jsonFormatter.Indent = true;
+		
+		//Enabling the Microsoft Date Format
+		jsonFormatter.SerializerSettings.DateFormatHandling = DateFormatHandling.MicrosoftDateFormat;
+		
+		//Enabling HTML Character Escaping
+		jsonFormatter.SerializerSettings.StringEscapeHandling = StringEscapeHandling.EscapeHtml;
+		
+		//Ignoring Default Values
+		jsonFormatter.SerializerSettings.DefaultValueHandling = DefaultValueHandling.Ignore;
+	}
+}
+```
+
+
 ## Model Binding
+```cs
+//Registering the Media Type Formatter & Mapping Methods
+//WebApiConfig.cs
+//Registering a Media Type Formatter
+public static class WebApiConfig {
+
+	//Registering the Media Type Formatter
+	public static void Register(HttpConfiguration config) {
+		config.Formatters.Add(new ProductFormatter());
+	}
+	
+	//Using Media Type Formatter Mapping Methods in the WebApiConfig.cs File
+	MediaTypeFormatter prodFormatter = new ProductFormatter();
+	prodFormatter.AddQueryStringMapping("format", "product", "application/x.product");
+	prodFormatter.AddRequestHeaderMapping("X-UseProductFormat", "true", StringComparison.InvariantCultureIgnoreCase, false, "application/x.product");
+	prodFormatter.AddUriPathExtensionMapping("custom", "application/x.product");
+	config.Formatters.Add(prodFormatter);
+
+}
+```
+
 ## Input Validation
 ## Dependency Resolution
 ## Testing
