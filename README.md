@@ -219,6 +219,22 @@ public static class WebApiConfig
     }
 }
 ```
+
+### Our Web API Route Registration
+```cs
+protected void Application_Start(object sender, EventArgs e) {
+	var config = GlobalConfiguration.Configuration;
+	var routes = config.Routes;
+	
+	routes.MapHttpRoute(
+		"DefaultHttpRoute",
+		"api/{controller}/{id}",
+		new { id = RouteParameter.Optional }
+		);
+}
+```
+
+
 ## Controllers
 ```cs
 //Defining a Common Prefix
@@ -448,6 +464,65 @@ public class RsvpController : ApiController {
 	}
 }		
 ```
+
+
+## Understanding Parameter and Model Binding
+
+```cs
+[HttpGet]
+[HttpPost]
+public int SumNumbers(int first, int second) {
+	return first + second;
+}
+
+//Using a Model Class - Refer: Numbers.cs
+[HttpGet]
+[HttpPost]
+public int SumNumbers(Numbers calc) {
+	return calc.First + calc.Second;
+}
+
+//Adding an Action Method Parameter - refer: Operation.cs
+[HttpGet]
+[HttpPost]
+public int SumNumbers(Numbers calc, Operation op) {
+	int result = op.Add ? calc.First + calc.Second : calc.First - calc.Second;
+	return op.Double ? result * 2 : result;
+}
+
+//Getting Values for a Complex Type from the Request URL
+[HttpGet]
+[HttpPost]
+public int SumNumbers([FromUri] Numbers calc, [FromUri] Operation op) {
+	int result = op.Add ? calc.First + calc.Second : calc.First - calc.Second;
+	return op.Double ? result * 2 : result;
+}
+
+//Using the FromBody Attribute
+[HttpGet]
+[HttpPost]
+public int SumNumbers([FromBody] int number) {
+	return number * 2;
+}
+
+
+//Defining a Binding Rule in the WebApiConfig.cs File
+config.ParameterBindingRules.Insert(0, typeof(Numbers), x => x.BindWithAttribute(new FromUriAttribute()));
+
+
+//Numbers.cs
+public class Numbers {
+	public int First { get; set; }
+	public int Second { get; set; }
+}
+
+//Operation.cs
+public class Operation {
+	public bool Add { get; set; }
+	public bool Double { get; set; }
+}
+```
+
 ## Message Handlers
 ## Filters
 ## Media Type Formatters
@@ -640,13 +715,239 @@ public static class WebApiConfig {
 ```
 
 ## Input Validation
+
+```cs
+using System.ComponentModel.DataAnnotations;
+namespace PartyInvites.Models {
+	public class GuestResponse {
+		[HttpBindNever]
+		public int Id { get; set; }
+		[Required]
+		public string Name { get; set; }
+		[Required]
+		public string Email { get; set; }
+		[Required]
+		[Range(1, 100000)]
+		public decimal Price { get; set; }
+		[Required]
+		public bool? WillAttend { get; set; }
+	}
+}
+
+```
+
 ## Dependency Resolution
 ## Testing
 ## Optimization and Performance
 ## Hosting
+
+
+## Filter
+```cs
+//Registering a Global Filter in the WebApiConfig.cs File
+public static class WebApiConfig {
+	public static void Register(HttpConfiguration config) {
+		config.Filters.Add(new SayHelloAttribute { Message = "Global Filter" });
+		
+		config.MessageHandlers.Add(new AuthenticationDispatcher());
+	}
+}
+
+//SayHelloAttribute
+using System.Web.Http.Filters;
+namespace Dispatch.Infrastructure {
+	public class SayHelloAttribute : ActionFilterAttribute {
+		public string Message { get; set; }
+		
+		public override Task OnActionExecutingAsync(HttpActionContext actionContext, CancellationToken cancellationToken) {
+			Debug.WriteLine("SayHello: {0}", (object)Message ?? "Hello");
+			return Task.FromResult<object>(null);
+		}
+	}
+}
+
+
+//Appling the Authorization Filter
+namespace Dispatch.Controllers {
+	[Time]
+	public class ProductsController : ApiController {
+
+		[CustomAuthentication]
+		[CustomAuthorization("admins")]
+		public Product Get(int id) {
+			return products.Where(x => x.ProductID == id).FirstOrDefault();
+		}
+	}
+}	
+	
+	
+//Creating an Exception Filter
+public class CustomExceptionAttribute : Attribute, IExceptionFilter {
+	public Task ExecuteExceptionFilterAsync(HttpActionExecutedContext actionExecutedContext, CancellationToken cancellationToken) {
+		if (actionExecutedContext.Exception != null && actionExecutedContext.Exception is ArgumentOutOfRangeException) {
+			actionExecutedContext.Response = actionExecutedContext.Request.CreateErrorResponse( HttpStatusCode.BadRequest, "No data item");
+		}
+	
+		return Task.FromResult<object>(null);
+	}
+
+	public bool AllowMultiple {
+		get { return true; }
+	}
+}
+```
 ## Error Handling
+```cs
+//Applying the HttpResponseException
+[LogErrors]
+public Product Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+		if (product == null) {
+			throw new HttpResponseException(HttpStatusCode.BadRequest);
+		}
+	return product;
+}
+
+
+//Using an Implementation of the IHttpActionResult Interface
+[LogErrors]
+public IHttpActionResult Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+		if (product == null) {
+			return BadRequest("No such data object");
+		}
+	return Ok(product);
+}
+
+
+//Creating an Error Response
+[LogErrors]
+public HttpResponseMessage Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+	if (product == null) {
+		return Request.CreateErrorResponse(HttpStatusCode.BadRequest, new HttpError {
+			Message = "No such data item",
+			MessageDetail = string.Format("No item ID {0} was found", id)
+		});
+	}
+	return Request.CreateResponse(product);
+}
+
+
+//Adding Extra Error Information
+[LogErrors]
+public HttpResponseMessage Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+	if (product == null) {
+		HttpError error = new HttpError();
+		error.Message = "No such data item";
+		error.Add("RequestID", id);
+		error.Add("AvailbleIDs", products.Select(x => x.ProductID));
+		return Request.CreateErrorResponse(HttpStatusCode.BadRequest, error);
+	}
+	return Request.CreateResponse(product);
+}
+
+//Adding Model State Data to the Error
+public HttpResponseMessage Post(Product product) {
+	if (!ModelState.IsValid) {
+		HttpError error = new HttpError(ModelState, false);
+		error.Message = "Cannot Add Product";
+		error.Add("AvailbleIDs", products.Select(x => x.ProductID));
+		return Request.CreateErrorResponse(HttpStatusCode.BadRequest, error);
+	}
+	product.ProductID = products.Count + 1;
+	products.Add(product);
+
+	return Request.CreateResponse(product);
+}
+
+
+public static class WebApiConfig {
+public static void Register(HttpConfiguration config) {
+	//Setting the Exception Detail Policy
+	config.IncludeErrorDetailPolicy = IncludeErrorDetailPolicy.Never;
+	
+	//Registering a Global Exception Handler
+	config.Services.Replace(typeof(IExceptionHandler), new CustomExceptionHandler());
+	
+	//Registering a Custom Global Exception Logger
+	config.Services.Add(typeof(IExceptionLogger), new CustomExceptionLogger());
+}
+
+
+//Throwing Exceptions
+[LogErrors]
+public Product Get(int id) {
+	Product product = products.Where(x => x.ProductID == id).FirstOrDefault();
+	if (product == null) {
+		throw new ArgumentOutOfRangeException("id");
+	}
+		return product;
+}
+```
 ## Tracing and Logging
 ## API Documentation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
