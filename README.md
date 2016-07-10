@@ -155,6 +155,15 @@ public static class WebApiConfig
 			routeTemplate: "api/Posts/{year}/{month}/{day}", 
 			defaults: new { controller = "Posts", month = RouteParameter.Optional, day = RouteParameter.Optional } );
 		
+		//Works: http://localhost:55778/api/123/employees/12345
+		//Doesn't Works: http://localhost:55778/api/abc/employees/12345
+		config.Routes.MapHttpRoute(
+			name: "DefaultApi",
+			routeTemplate: "api/{orgid}/{controller}/{id}",
+			defaults: new { id = RouteParameter.Optional },
+			constraints: new { orgid = @"\d+" }
+		);
+
 		config.Routes.MapHttpRoute( 
 			name: "PostByDate", 
 			routeTemplate: "api/Posts/{year}/{month}/{day}", 
