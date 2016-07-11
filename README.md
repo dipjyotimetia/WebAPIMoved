@@ -1192,6 +1192,36 @@ public static class WebApiConfig {
 }
 ```
 
+### GET Request URI Having Two QueryString Parameters
+//http://localhost:1051/api/values/?param1=1& param2=2
+
+public class ValuesController : ApiController {
+	public int Get() {
+		var param1 = Request.RequestUri.ParseQueryString().Get("param1");
+		var param2 = Request.RequestUri.ParseQueryString().Get("param2");
+		
+		if (!string.IsNullOrEmpty(param1) && !String.IsNullOrEmpty(param2)) {
+			return Convert.ToInt32(param1) + Convert.ToInt32(param2);
+		}
+		throw new HttpResponseException(HttpStatusCode.BadRequest);
+	}
+}
+
+
+### SearchController to Perform a Search for Persons’ Names
+//http://localhost:1051/api/search/?text=Bill&maxresults=2
+public class Search {
+	public string Text { get; set; }
+	public int MaxResults { get; set; }
+}
+
+
+public IEnumerable<string> Get([FromUri] Search search) {
+	return _persons
+	.Where(w => w.Contains(search.Text))
+	.Take(search.MaxResults);
+}
+
 ## Input Validation
 
 ```cs
