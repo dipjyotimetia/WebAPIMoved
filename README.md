@@ -318,6 +318,158 @@ public class CarsController : ApiController {
 	}
 
 }
+
+```
+
+
+
+### Retrieval of Employees by Department
+```cs
+//http://localhost:55778/api/employees?department=2
+public IEnumerable<Employee> GetByDepartment(int department)
+{
+	int[] validDepartments = {1, 2, 3, 5, 8, 13};
+	if (!validDepartments.Any(d => d == department))
+	{
+		var response = new HttpResponseMessage()
+		{
+			StatusCode = (HttpStatusCode)422, // Unprocessable Entity
+			ReasonPhrase = "Invalid Department"
+		};
+		throw new HttpResponseException(response);
+	}
+	return list.Where(e => e.Department == department);
+}
+```
+
+
+
+### It is possible to apply multiple conditions based on parameters. 
+```cs
+http://localhost:port/api/employees?department=2&lastname=Smith
+
+
+Listing 1-21. Retrieving an Employee by Applying Two Conditions
+public IEnumerable<Employee> Get([FromUri]Filter filter)
+{
+	return list.Where(e => e.Department == filter.Department &&
+	e.LastName == filter.LastName);
+}
+
+//Create a class named Filter, under the Models folder.
+public class Filter
+{
+	public int Department { get; set; }
+	public string LastName { get; set; }
+}
+```
+
+
+### Creating a Resource with a Server-Generated Identifier
+```cs
+//Creating an Employee using HTTP POST
+public HttpResponseMessage Post(Employee employee)
+{
+	int maxId = list.Max(e => e.Id);
+	employee.Id = maxId + 1;
+	list.Add(employee);
+	
+	var response = Request.CreateResponse<Employee>(HttpStatusCode.Created, employee);
+	
+	string uri = Url.Link("DefaultApi", new { id = employee.Id });
+	response.Headers.Location = new Uri(uri);
+	
+	return response;
+}
+
+//Output: Response Status Code and Headers
+HTTP/1.1 201 Created
+Date: Mon, 26 Mar 2013 07:35:07 GMT
+Location: http://localhost:55778/api/employees/12348
+Content-Type: application/json; charset=utf-8
+```
+
+
+### Creating a Resource with a Client-Supplied Identifier
+
+//A resource such as an employee can be created by an HTTP PUT to the URI http://localhost:port/api/ employees/12348, 
+//where the employee with an ID of 12348 does not exist until this PUT request is processed.
+//In this case, the request body contains the JSON/XML representation of the resource being added, which is the new employee.
+
+```cs
+Creating an Employee using HTTP PUT
+public HttpResponseMessage Put(int id, Employee employee)
+{
+	if (!list.Any(e => e.Id == id))
+	{
+		list.Add(employee);
+		var response = Request.CreateResponse<Employee>(HttpStatusCode.Created, employee);
+		
+		string uri = Url.Link("DefaultApi", new { id = employee.Id });
+		response.Headers.Location = new Uri(uri);
+		return response;
+	}
+	return Request.CreateResponse(HttpStatusCode.NoContent);
+}
+```
+
+### Overwriting a Resource
+//A resource can be overwritten using HTTP PUT. This operation is generally considered the same as updating the resource, but there is a difference.
+```cs
+public HttpResponseMessage Put(int id, Employee employee)
+{
+	int index = list.ToList().FindIndex(e => e.Id == id);
+	if (index >= 0)
+	{
+		list[index] = employee; // overwrite the existing resource
+		return Request.CreateResponse(HttpStatusCode.NoContent);
+	}
+	else
+	{
+		list.Add(employee);
+		var response = Request.CreateResponse<Employee>
+		(HttpStatusCode.Created, employee);
+		string uri = Url.Link("DefaultApi", new { id = employee.Id });
+		response.Headers.Location = new Uri(uri);
+		return response;
+	}
+}
+```
+
+### Updating a Resource
+//A resource such as an employee in our example can be updated by an HTTP POST to the URI
+//http://server/api/employees/12345, where the employee with an ID of 12345 already exists in the system.
+```cs
+public HttpResponseMessage Post(int id, Employee employee)
+{
+	int index = list.ToList().FindIndex(e => e.Id == id);
+	if (index >= 0)
+	{
+		list[index] = employee;
+		return Request.CreateResponse(HttpStatusCode.NoContent);
+	}
+	return Request.CreateResponse(HttpStatusCode.NotFound);
+}
+```
+
+### Route
+```cs
+[RoutePrefixAttribute("api/employeeTasks")]
+public class TasksController : ApiController
+{
+	[Route("{id:int:max(100)}")]
+	public string GetTaskWithAMaxIdOf100(int id)
+	{
+		return "In the GetTaskWithAMaxIdOf100(int id) method, id = " + id;
+	}
+	
+	[Route("{id:int:min(101)}")]
+	[HttpGet]
+	public string FindTaskWithAMinIdOf101(int id)
+	{
+		return "In the FindTaskWithAMinIdOf101(int id) method, id = " + id;
+	}
+{
 ```
 
 ## Actions
@@ -465,6 +617,14 @@ public class RsvpController : ApiController {
 }		
 ```
 
+## Secure
+```cs
+//Applying Authorization in the ProductsController.cs File
+[Authorize(Roles = "Administrators")]
+public async Task DeleteProduct(int id) {
+	await Repository.DeleteProductAsync(id);
+}
+```
 
 ## Understanding Parameter and Model Binding
 
@@ -524,7 +684,7 @@ public class Operation {
 ```
 
 ## Message Handlers
-## Filters
+
 ## Media Type Formatters
 //Product.cs
 //Creating a CSV Media Formatter
