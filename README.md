@@ -260,6 +260,250 @@ protected void Application_Start(object sender, EventArgs e) {
 
 ```
 
+### Define Direct Routes
+```cs
+public class TeamsController : ApiController
+{
+	[Route("api/teams/{id}")]
+	public Team GetTeam(int id)
+	{
+		//omitted for brevity
+	}
+	
+	[Route("api/teams")]
+	public IEnumerable<Team> GetTeams()
+	{
+		//omitted for brevity
+	}
+	[Route("api/teams/{teamId}/players")]
+	public IEnumerable<Player> GetPlayers(int teamId)
+	{
+		//omitted for brevity
+	}
+}
+
+Add this in the config.
+config.MapHttpAttributeRoutes();
+
+//Route Prefix
+[RoutePrefix("api/teams")]
+public class TeamsController : ApiController
+{
+	[Route("{id}")]
+	public Team GetTeam(int id)
+	{
+	//omitted for brevity
+	}
+}
+```
+
+### Set Default Route Values
+```cs
+//centralized
+config.Routes.MapHttpRoute(
+name: "DefaultApi",
+routeTemplate: "{controller}/{id}",
+defaults: new { id = 100 }
+);
+
+//attribute routing
+[Route("items/{id:int=100}")]
+public HttpResponseMessage Get(int id) {}
+
+//inline
+public HttpResponseMessage Get(int id = 100) {}
+
+myapi.com/items/
+myapi.com/items/100
+```
+
+### Set Optional Route Values
+
+```cs
+Usage of Optional Parameters with Attribute Routing
+[Route("orders/{skip?},{take?}")]
+public HttpResponseMessage GetFiltered(int? skip = null, int? take = null)
+{
+	var query = orders.AsQueryable();
+	if (skip.HasValue)
+	{
+		query = query.Skip(skip.Value);
+	}
+	if (take.HasValue)
+	{
+		query = query.Take(take.Value);
+	}
+	return Request.CreateResponse(HttpStatusCode.OK, query);
+}
+
+
+Usage of Optional Parameters with Centralized Routing
+config.Routes.MapHttpRoute(
+name: "OrdersFilter",
+routeTemplate: "orders/{skip},{take}}",
+defaults: new {skip = RouteParameter.Optional, take = RouteParameter.Optional}
+);
+```
+
+### Set Route Constraints
+```cs
+config.Routes.MapHttpRoute(
+	name: "DefaultApi",
+	routeTemplate: "orders/{text}",
+	constraints: new { text = new AlphaRouteConstraint() },
+	defaults: null
+	);
+
+config.Routes.MapHttpRoute(
+	name: "DefaultApi",
+	routeTemplate: "size/{id}",
+	constraints: new { httpMethod = new HttpMethodConstraint(HttpMethod.Get) },
+	defaults: null
+	);	
+```
+	
+### Define Remote Procedure Call Style Routes	
+```cs
+config.Routes.MapHttpRoute(
+	name: "LatestOrder",
+	routeTemplate: "api/orders/getlatestorder"}",
+	defaults: new { controller = "Orders", action = "GetLatestOrder" }
+	);
+
+config.Routes.MapHttpRoute(
+	name: "Orders",
+	routeTemplate: "api/orders/{action}/{id}",
+	defaults: new { controller = "Orders", id = RouteParameter.Optional }
+	);
+
+config.Routes.MapHttpRoute(
+	name: "DefaultApi",
+	routeTemplate: "api/{controller}/{action}/{id}",
+	defaults: new { id = RouteParameter.Optional }
+	);
+
+the client now has to call your HTTP endpoints in the following matter:
+• myapi.com/api/orders/getall
+• myapi.com/api/orders/getbyid/1
+
+
+//the controller is OrdersController
+[Route("orders/getbyid/{id}")]
+public HttpResponseMessage Get(int id)
+{
+	//omitted for brevity
+}
+
+[Route("orders/getall")]
+public HttpResponsesMessage GetAll()
+{
+	//omitted for brevity
+}
+
+[RoutePrefix("direct")]
+[Route("items/{action}")]
+public class ItemsController : ApiController
+{
+	//omitted for brevity
+}
+```
+
+### Create Catch-all Routes
+```cs
+config.Routes.MapHttpRoute(
+	name: "DefaultApi",
+	routeTemplate: "{*params}"
+	);
+
+public class ProxyController : ApiController
+{
+	[Route("{*params}")]
+	public HttpResponseMessage Get(string params)
+	{
+		//omitted for brevity
+	}
+}
+
+GET myapi.com/1
+• GET myapi.com/hello
+• GET myapi.com/www.google.com
+• GET myapi.com/monday/filip/192.5
+
+Catch-all ASP.NET Web API Routes—But Only for Requests for proxy/*
+config.Routes.MapHttpRoute(
+	name: "DefaultApi",
+	routeTemplate: "proxy/{*params}"
+	);
+
+public class ProxyController : ApiController
+{
+	[Route("proxy/{*params}")]
+	public HttpResponseMessage Get(string params)
+	{
+		//omitted for brevity
+	}
+}
+```
+
+### Prevent Controller Methods from Inadvertently Becoming Web API Endpoints
+```cs
+//not an action
+[NonAction]
+public string GetCustomer()
+{
+	//omitted for brevity
+}
+```
+
+### Localize Routes
+```cs
+public class Startup
+{
+public void Configuration(IAppBuilder appBuilder)
+{
+	var config = new HttpConfiguration();
+	config.MapHttpAttributeRoutes(new LocalizedDirectRouteProvider());	//Custom Implementation
+	LocalizedRouteAttribute.Routes.Add("order", new Dictionary<string, string>
+	{
+		{ "de-CH", "auftrag" },
+		{ "pl-PL", "zamowienie" }
+	});
+	LocalizedRouteAttribute.Routes.Add("orderById", new Dictionary<string, string>
+	{
+		{ "de-CH", "auftrag/{id:int}" },
+		{ "pl-PL", "zamowienie/{id:int}" }
+	});
+	appBuilder.UseWebApi(config);
+	}
+}
+
+
+public class OrdersController : ApiController
+{
+	[LocalizedRoute("order", Name = "order")]
+	public HttpResponseMessage Get()
+	{
+		//omitted for brevity
+	}
+	[LocalizedRoute("order/{id:int}", Name = "orderById")]
+	public HttpResponseMessage GetById(int id)
+	{
+		//omitted for brevity
+	}
+}
+
+• myapi.com/order (English route)
+• myapi.com/auftrag (German route)
+• myapi.com/zamowienie (Polish route)
+• myapi.com/order/{id} (English route)
+• myapi.com/auftrag/{id} (German route)
+• myapi.com/zamowienie/{id} (Polish route)
+```
+
+### Generate a Link to the Route
+```cs
+var routeLink = Url.Link("GetTeamById", new {id = team.Id});
+```
 
 ## Controllers
 
