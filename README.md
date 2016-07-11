@@ -1118,6 +1118,57 @@ public static class WebApiConfig {
 }
 ```
 
+### Registering a New Formatter
+```cs
+protected void Application_Start(object sender, EventArgs e) {
+
+	//Registering a New Formatter in ASP.NET Web API Configuration
+	var config = GlobalConfiguration.Configuration;
+	config.Formatters.Add(new PlainTextFormatter());
+	
+	///Adding a New Formatter at a Specific Position of the MediaTypeFormatterCollection
+	config.Formatters.Insert(0, new JsonpMediaTypeFormatter());
+	
+	//Removing a Formatter
+	config.Formatters.Remove(config.Formatters.JsonFormatter);	
+	
+}
+```
+
+### Media Type Mappings
+• UriPathExtensionMapping
+• QueryStringMapping
+• RequestHeaderMapping
+	http://localhost:40553/car/1?format=jsonp&callback=jsonp1311664395075
+
+
+```cs
+//Registering a QueryStringMapping Instead of a UriPathExtensionMapping
+public JsonpMediaTypeFormatter() { 
+	SupportedMediaTypes.Add(DefaultMediaType);
+	SupportedMediaTypes.Add(new MediaTypeHeaderValue("text/javascript"));
+	MediaTypeMappings.Add(new QueryStringMapping("format", "jsonp", DefaultMediaType));
+}
+
+//RequestHeaderMapping
+public class Global : HttpApplication {
+	protected void Application_Start(object sender, EventArgs e) {
+		var config = GlobalConfiguration.Configuration;
+		
+		config.Formatters.JsonFormatter.MediaTypeMappings.Add(
+		new RequestHeaderMapping(
+		"Referer",
+		"http://localhost:1501/",
+		StringComparison.InvariantCultureIgnoreCase,
+		false,
+		"text/xml"));
+		
+		
+	}
+}
+```
+
+
 
 ## Model Binding
 ```cs
