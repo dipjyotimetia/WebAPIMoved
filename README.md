@@ -1431,7 +1431,86 @@ public class Car : IValidatableObject {
 
 ```
 
+### Blacklisting Members
+```cs
+public class Employee
+{
+	public int Id { get; set; }
+	public string FirstName { get; set; }
+	public string LastName { get; set; }
 
+	[JsonIgnore] // Ignored only by Json.NET
+	public string Title { get; set; }
+
+	[IgnoreDataMember] // Ignored by both Json.NET and DCS
+	public string Department { get; set; }
+}
+```
+
+### Whitelisting Members
+```cs
+[DataContract]
+public class Employee
+{
+	[DataMember]
+	public int Id { get; set; }
+	
+	public string FirstName { get; set; } // Does not get serialized
+	
+	[DataMember]
+	public string LastName { get; set; }
+	
+	[DataMember]
+	public decimal Compensation
+	{
+		// Serialized with json.NET but fails with an exception in case of 	80
+		// DataContractSerializer, since set method is absent
+		get
+		{
+			return 5000.00M;
+		}
+	}
+}
+```
+
+### Controlling Member Names
+```cs
+//The Employee Class with Member Names Customized for Serialization
+public class Employee
+{
+	[JsonProperty(PropertyName="Identifier")]
+	public int Id { get; set; }
+	
+	public string FirstName { get; set; }
+	
+	[DataMember(Name="FamilyName")] // No effect unless DataContract used
+	public string LastName { get; set; }
+}
+```
+
+
+config.Formatters.JsonFormatter.SerializerSettings.Formatting = Formatting.Indented;
+config.Formatters.JsonFormatter.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+
+### Returning Only a Subset of Members
+```cs
+
+public HttpResponseMessage Get()
+{
+	//Id, FirstName
+	var values = list.Select(e => new
+	{
+		Identifier = e.Id, LastName, Compensation, Department
+		Name = e.FirstName + " " + e.LastName
+	});
+	var response = new HttpResponseMessage(HttpStatusCode.OK)
+	{
+		Content = new ObjectContent(values.GetType(),	values,
+			Configuration.Formatters.JsonFormatter)
+	};
+	return response;
+}
+```
 
 
 ## Dependency Resolution
