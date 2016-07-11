@@ -867,6 +867,90 @@ public class Operation {
 ```
 
 ## Message Handlers
+### HttpMessageHandler Abstract Base Class Implementation
+```cs
+namespace System.Net.Http
+{
+	public abstract class HttpMessageHandler : IDisposable
+	{
+		protected HttpMessageHandler()
+		{
+			if (Logging.On)
+			Logging.Enter(Logging.Http, (object) this, ".ctor", (string) null);
+			
+			if (!Logging.On)
+			return;
+			
+			Logging.Exit(Logging.Http, (object) this, ".ctor", (string) null);
+		}
+}
+```
+
+### Adding a Custom Response Header
+```cs
+public class XPoweredByHeaderHandler : DelegatingHandler
+{
+	const string XPOWEREDBYHEADER = "X-Powered-By";
+	const string XPOWEREDBYVALUE = "ASP.NET Web API";
+	
+	protected override Task<HttpResponseMessage> SendAsync(
+		HttpRequestMessage request, CancellationToken cancellationToken)
+	{
+		return base.SendAsync(request, cancellationToken).ContinueWith(
+			(task) =>
+			{
+				HttpResponseMessage response = task.Result;
+				response.Headers.Add(XPOWEREDBYHEADER, XPOWEREDBYVALUE);
+				return response;
+			}
+		);
+	}
+}
+
+//Registration of Two Custom Message Handlers in Global.asax.cs
+
+public class WebApiApplication : System.Web.HttpApplication
+{
+	protected void Application_Start()
+	{
+		RouteConfig.RegisterRoutes(RouteTable.Routes);
+		var config = GlobalConfiguration.Configuration;
+		config.MessageHandlers.Add(new XHttpMethodOverrideHandler());
+		config.MessageHandlers.Add(new XPoweredByHeaderHandler());
+	}
+}
+```
+
+### Per-Route Message Handlers - API Key Message Handler Implementation
+```cs
+public class ApiKeyProtectionMessageHandler : DelegatingHandler {
+	protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+	CancellationToken cancellationToken) {
+		IEnumerable<string> values;
+		request.Headers.TryGetValues("apikey", out values);
+		
+		if (null != values && values.Count() == 1) {
+			return base.SendAsync(request, cancellationToken);
+		}
+		
+		var tcs = new TaskCompletionSource<HttpResponseMessage>();
+		tcs.SetResult(new HttpResponseMessage(HttpStatusCode.Unauthorized) {
+			ReasonPhrase = "API Key required."
+		});
+		return tcs.Task;
+	}
+}
+
+routes.MapHttpRoute(
+	name: "Secret Api",
+	routeTemplate: "secretapi/{controller}/{id}",
+	defaults: new {id = RouteParameter.Optional},
+	constraints: null,
+	handler: new ApiKeyProtectionMessageHandler() {
+	InnerHandler =
+	new HttpControllerDispatcher(GlobalConfiguration.Configuration)
+});
+```
 
 ## Media Type Formatters
 //Product.cs
