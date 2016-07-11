@@ -601,6 +601,12 @@ public class RsvpController : ApiController {
 	public string DayOfWeek(int day) {
 		return Enum.GetValues(typeof(DayOfWeek)).GetValue(day).ToString();
 	}
+	
+	[AcceptVerbs("GET")]
+	public Employee RetrieveEmployeeById(int id)
+	{
+		return list.First(e => e.Id == id);
+	}
 
 	//Applying the Order Property to the Route Attribute
 	[HttpGet]
@@ -614,6 +620,13 @@ public class RsvpController : ApiController {
 	public string DayOfWeek() {
 		return DateTime.Now.ToString("dddd");
 	}
+	
+	[CustomException]
+	public Product Get(int id) {
+		return products[id];
+		//return products.Where(x => x.ProductID == id).FirstOrDefault();
+	}
+	
 }		
 ```
 
