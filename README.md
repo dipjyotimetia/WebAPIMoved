@@ -2170,6 +2170,49 @@ public void GetAll_should_return_all_from_OrderService_Subspec()
 ```
 ## Optimization and Performance
 ## Hosting
+### Self-Hosting ASP.NET Web API
+
+```cs
+//http://localhost:8086/api/employees/1
+
+using System;
+using System.Web.Http.SelfHost;
+using Robusta.TalentManager.WebApi.Core.Configuration;
+class Program
+{
+	static void Main(string[] args)
+	{
+		var configuration = new HttpSelfHostConfiguration("http://localhost:8086");
+		WebApiConfig.Register(configuration);
+		DtoMapperConfig.CreateMaps();
+		IocConfig.RegisterDependencyResolver(configuration);
+		using (HttpSelfHostServer server = new HttpSelfHostServer(configuration))
+		{
+			server.OpenAsync().Wait();
+			Console.WriteLine("Press Enter to terminate the server...");
+			Console.ReadLine();
+		}
+	}
+}
+```
+
+### In-Memory Hosting ASP.NET Web API
+```cs
+[Authorize]
+public HttpResponseMessage Get(int id)
+{
+	var employee = repository.Find(id);
+	if (employee == null)
+	{
+		var response = Request.CreateResponse(HttpStatusCode.NotFound, "Employee not found");
+		throw new HttpResponseException(response);
+	}
+	
+	return Request.CreateResponse<EmployeeDto>(
+	HttpStatusCode.OK,
+	mapper.Map<Employee, EmployeeDto>(employee));
+}
+```
 
 
 ## Filters
