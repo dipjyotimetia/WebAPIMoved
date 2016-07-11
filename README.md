@@ -1168,6 +1168,43 @@ public class Global : HttpApplication {
 }
 ```
 
+### Requesting a Content Type through the Query String
+```cs
+// GET http://localhost:55778/api/employees/12345?frmt=json HTTP/1.1
+// GET http://localhost:55778/api/employees/12345?frmt=xml HTTP HTTP/1.1
+
+public static class WebApiConfig
+{
+	public static void Register(HttpConfiguration config)
+	{
+
+		config.Formatters.JsonFormatter.MediaTypeMappings.Add(
+			new QueryStringMapping("frmt", "json",
+			new MediaTypeHeaderValue("application/json")));
+
+		config.Formatters.XmlFormatter.MediaTypeMappings.Add(
+			new QueryStringMapping("frmt", "xml",
+			new MediaTypeHeaderValue("application/xml")));
+		foreach (var formatter in config.Formatters)
+		{
+			Trace.WriteLine(formatter.GetType().Name);
+			Trace.WriteLine("\tCanReadType: " + formatter.CanReadType(typeof(Employee)));
+			Trace.WriteLine("\tCanWriteType: " + formatter.CanWriteType(typeof(Employee)));
+			Trace.WriteLine("\tBase: " + formatter.GetType().BaseType.Name);
+			Trace.WriteLine("\tMedia Types: " + String.Join(", ", formatter.SupportedMediaTypes));
+		}	
+	}
+}
+```
+
+### Requesting a Content Type through the Header 
+```cs
+config.Formatters.JsonFormatter
+	.MediaTypeMappings.Add(
+		new RequestHeaderMapping("X-Media", "json",
+			StringComparison.OrdinalIgnoreCase, false,
+				new MediaTypeHeaderValue("application/json")));
+```
 
 
 ## Model Binding
