@@ -1527,6 +1527,128 @@ public class TaxCalculator : ITaxCalculator
 	// ... rest of the implementation
 }
 
+### Validation Using Data Annotations
+```cs
+public void Post(Employee employee)
+{
+	if (ModelState.IsValid)
+	{
+		// Just be happy and do nothing
+	}
+	else
+	{
+		var errors = ModelState.Where(e => e.Value.Errors.Count > 0)
+		.Select(e => new
+		{
+			Name = e.Key,
+			Message = e.Value.Errors.First().ErrorMessage}).ToList();
+		}
+	}	
+}	
+```
+
+### Removal of InvalidModelValidatorProvider
+```cs
+public static class WebApiConfig
+{
+	public static void Register(HttpConfiguration config)
+	{
+		config.Services.RemoveAll(typeof(ModelValidatorProvider),v => v is InvalidModelValidatorProvider);
+	}
+}
+```
+
+### Handling Validation Errors
+```cs
+//Action filters in the ASP.NET Web API pipeline
+public class ValidationErrorHandlerFilterAttribute : ActionFilterAttribute
+{
+	public override void OnActionExecuting(HttpActionContext actionContext)
+	{
+		if (!actionContext.ModelState.IsValid)
+		{
+			actionContext.Response = actionContext.Request.CreateErrorResponse(
+				HttpStatusCode.BadRequest, actionContext.ModelState);
+		}
+	}
+}
+
+//configure it as a global filter in the Register method of WebApiConfig in the App_Start folder
+config.Filters.Add(new ValidationErrorHandlerFilterAttribute());
+```
+
+### Extending an Out-of-the-Box Validation Attribute
+```cs
+//The MemberRangeAttribute Class
+public class MemberRangeAttribute : RangeAttribute
+{
+	public MemberRangeAttribute(int minimum, int maximum) : base(minimum, maximum) { }
+	public override bool IsValid(object value)
+	{
+		if (value is ICollection)
+		{
+			var items = (ICollection)value;
+			return items.Cast<int>().All(i => IsValid(i));
+		}
+		else
+			return base.IsValid(value);
+		}
+	}
+}
+```
+
+### Creating Your Own Validation Attribute
+```cs
+public class Employee
+{
+	[Range(10000, 99999)]
+	public int Id { get; set; }
+
+	[LimitChecker("AnnualIncome", 75)]
+	public decimal Contribution401K { get; set; }
+}
+
+
+public class LimitCheckerAttribute : ValidationAttribute
+{
+	public LimitCheckerAttribute(string baseProperty, double percentage)
+	{
+		this.BaseProperty = baseProperty;
+		this.Percentage = percentage;
+		this.ErrorMessage = "{0} cannot exceed {1}% of {2}";
+	}
+	
+	public string BaseProperty { get; set; }
+	public double Percentage { get; set; }
+	
+	public override string FormatErrorMessage(string name)
+	{
+		return string.Format(ErrorMessageString, name, this.Percentage, BaseProperty);
+	}
+	
+	protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+	{
+		decimal amount = (decimal)value;
+		var propertyInfo = validationContext
+		.ObjectType
+		.GetProperty(this.BaseProperty);
+		
+		if (propertyInfo != null)
+		{
+			decimal baseAmount = (decimal)propertyInfo.GetValue(
+			validationContext.ObjectInstance, null);
+			decimal maxLimit = baseAmount * (decimal)this.Percentage / 100;
+			if(amount <= maxLimit)
+				return ValidationResult.Success;
+			}
+		return new ValidationResult(FormatErrorMessage(validationContext.DisplayName));
+	}
+}
+```
+
+### Implementing the IValidatableObject Interface
+```cs
+```
 
 
 // registering ITaxCalculator in AutoFac
