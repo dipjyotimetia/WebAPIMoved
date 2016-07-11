@@ -1177,19 +1177,19 @@ public IHttpActionResult AddTask(HttpRequestMessage requestMessage, GuestRespons
 ## Hosting
 
 
-## Filter
+## Filters
+### SayHelloAttribute
 ```cs
 //Registering a Global Filter in the WebApiConfig.cs File
 public static class WebApiConfig {
 	public static void Register(HttpConfiguration config) {
 		config.Filters.Add(new SayHelloAttribute { Message = "Global Filter" });
-		
-		config.MessageHandlers.Add(new AuthenticationDispatcher());
 	}
 }
 
 //SayHelloAttribute
 using System.Web.Http.Filters;
+
 namespace Dispatch.Infrastructure {
 	public class SayHelloAttribute : ActionFilterAttribute {
 		public string Message { get; set; }
@@ -1202,7 +1202,7 @@ namespace Dispatch.Infrastructure {
 }
 
 
-//Appling the Authorization Filter
+### Appling the Authorization Filter
 namespace Dispatch.Controllers {
 	[Time]
 	public class ProductsController : ApiController {
@@ -1216,7 +1216,7 @@ namespace Dispatch.Controllers {
 }	
 	
 	
-//Creating an Exception Filter
+### Creating an Exception Filter
 public class CustomExceptionAttribute : Attribute, IExceptionFilter {
 	public Task ExecuteExceptionFilterAsync(HttpActionExecutedContext actionExecutedContext, CancellationToken cancellationToken) {
 		if (actionExecutedContext.Exception != null && actionExecutedContext.Exception is ArgumentOutOfRangeException) {
@@ -1231,6 +1231,107 @@ public class CustomExceptionAttribute : Attribute, IExceptionFilter {
 	}
 }
 ```
+
+### AuthorizeAttribute
+```cs
+GlobalConfiguration.Configuration.Filters.Add( new AuthorizeAttribute());
+
+public class AuthController : ApiController {
+	//Lines omitted for brevity
+	[AllowAnonymous]
+	public HttpResponseMessage Post(User user) {
+		//Lines omitted for brevity
+	}
+}
+```
+
+
+
+### SecondaryLoggerAttribute Implementation
+```cs
+public class SecondaryLoggerAttribute : ActionFilterAttribute {
+	private const string _loggerName = "SecondaryLogger";
+	
+	public override void OnActionExecuting(
+		HttpActionContext actionContext) {
+		
+		var controllerCtx = actionContext.ControllerContext;
+		
+		LoggerUtil.WriteLog(
+		_loggerName,
+		"OnActionExecuting",
+		controllerCtx.ControllerDescriptor.ControllerName,
+		actionContext.ActionDescriptor.ActionName
+		);
+	}
+	
+	public override void OnActionExecuted(
+		HttpActionExecutedContext actionExecutedContext) {
+		
+		var actionCtx = actionExecutedContext.ActionContext;
+		
+		var controllerCtx = actionCtx.ControllerContext;
+		LoggerUtil.WriteLog(
+		_loggerName,
+		"OnActionExecuted",
+		controllerCtx.ControllerDescriptor.ControllerName,
+		actionCtx.ActionDescriptor.ActionName
+		);
+	}
+}
+
+[Logger]
+public class CarsController : ApiController {
+	[SecondaryLogger]
+	public string[] GetCars() {
+		return new string[] {
+		"Car 1",
+		"Car 2",
+		"Car 3",
+		"Car 4"
+		};
+	}
+}
+```
+
+### logging functionality inside every controller action by passing 
+```cs
+//a relevant parameter to the private log method
+namespace Overview.Filters {
+	[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+	public class LoggerAttribute : Attribute, IActionFilter {
+		public Task<HttpResponseMessage> ExecuteActionFilterAsync(
+		HttpActionContext actionContext,
+		CancellationToken cancellationToken,
+		Func<Task<HttpResponseMessage>> continuation) {
+		
+		var controllerCtx = actionContext.ControllerContext;
+		Trace.TraceInformation(
+			"Controller {0}, Action {1} is running...",
+			controllerCtx.ControllerDescriptor.ControllerName,
+			actionContext.ActionDescriptor.ActionName
+		);
+		
+		//the way of saying everything is OK
+		return continuation();
+		}
+		
+		public bool AllowMultiple {
+			get {
+				return false;
+			}
+		}
+	}
+}
+
+//Registering LoggerAttribute as a Global Filter
+protected void Application_Start(object sender, EventArgs e) {
+	GlobalConfiguration.Configuration.Filters.Add(new LoggerAttribute());
+}
+
+```
+
+
 ## Error Handling
 ```cs
 //Applying the HttpResponseException
