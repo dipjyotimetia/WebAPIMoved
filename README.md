@@ -1223,34 +1223,179 @@ public IEnumerable<string> Get([FromUri] Search search) {
 }
 
 ## Input Validation
+### Data Annotation Validation Attributes
 
 ```cs
 using System.ComponentModel.DataAnnotations;
-namespace PartyInvites.Models {
-	public class GuestResponse {
-		[HttpBindNever]
-		public int Id { get; set; }
-		[Required]
-		public string Name { get; set; }
-		[Required]
-		public string Email { get; set; }
-		[Required]
-		[Range(1, 100000)]
-		public decimal Price { get; set; }
-		[Required]
-		public bool? WillAttend { get; set; }
-	}
-}
 
+namespace PartyInvites.Models {
+    public class GuestResponse {
+        [HttpBindNever]
+        public int Id { get; set; }
+		
+        [Required]
+        public string Name { get; set; }
+
+        public decimal Price { get; set; }
+
+        [Required]
+        public bool? WillAttend { get; set; }
+		
+		[Required(AllowEmptyStrings = true)]
+		public string Make { get; set; }
+
+		[Required]
+		[DataMember(IsRequired = true)]
+		public int Year { get; set; }
+
+		[Required]
+		[StringLength(maximumLength: 20, ErrorMessage = "For {0} field, the maximum allowed length is {1}.")]
+		public string Make { get; set; }
+
+		[Required]
+		[StringLength(maximumLength: 20, MinimumLength = 5)]
+		public string Model { get; set; }
+
+		[Required]
+		[StringLength(maximumLength: 20, MinimumLength = 5, ErrorMessageResourceName = "StringLengthAttribute_ValidationErrorIncludingMinimum",
+		ErrorMessageResourceType = typeof(ValidationErrors))]
+		public string Model { get; set; }
+
+		[Required]
+        [Range(1, 100000)]
+
+		[Range(type: typeof(DateTime), minimum: "2010-01-01", maximum: "9999-12-31")]
+		public DateTime PurchasedOn { get; set; }
+
+		[RegularExpression("([^\\s]+(\\.(?i)(jpg|png|gif|bmp))$)")]
+		public string ImageName { get; set; }
+
+		[EmailAddress]
+		public string EmailAddress { get; set; }
+
+		[MinLength(1)]
+		[MaxLength(4)]
+		public string[] Tags { get; set; }
+    }
+}
+```
+
+```cs
 
 [ValidateModel]
 public IHttpActionResult AddTask(HttpRequestMessage requestMessage, GuestResponse gr)
 {
-	var task = _processor.GuestResponse(gr);
-	return result;
+    var task = _processor.GuestResponse(gr);
+    return result;
+}
+
+//registered at the controller level to handle the validation errors and return an informative response to the client
+[InvalidModelStateFilter]
+public class CarsController : ApiController {
 }
 
 ```
+
+```cs
+protected void Application_Start(object sender, EventArgs e) {
+	var config = GlobalConfiguration.Configuration;
+	
+	//Removing InvalidModelValidatorProvider from the ModelValidatorProvider List
+	config.Services.RemoveAll( 
+		typeof(ModelValidatorProvider), 
+			validator => validator is InvalidModelValidatorProvider);
+	
+	
+	//Removing All Validator Providers Except for DataAnnotationsModelValidatorProvider
+	config.Services.RemoveAll(
+		typeof(ModelValidatorProvider),
+	validator => !(validator is DataAnnotationsModelValidatorProvider));
+	
+	// Suppressing the IRequiredMemberSelector for all formatters
+	foreach (var formatter in config.Formatters) {
+		formatter.RequiredMemberSelector = new SuppressedRequiredMemberSelector();
+	}
+}
+
+```
+
+
+
+
+
+### Creating Custom Validation Attributes
+
+```cs
+
+[AttributeUsage(AttributeTargets.Property)]
+public class GreaterThanAttribute : ValidationAttribute {
+
+	public string OtherProperty { get; private set; }
+
+	public override bool RequiresValidationContext {
+		get {
+			return true;
+		}
+	}
+	
+	public GreaterThanAttribute(string otherProperty) : 
+		base(errorMessage: "The {0} field must be greater than the {1} field.") {
+		
+		if (string.IsNullOrEmpty(otherProperty)) {
+			throw new ArgumentNullException("otherProperty");
+		}
+		OtherProperty = otherProperty;
+	}
+	
+	public override string FormatErrorMessage(string name) {
+		return string.Format(
+			CultureInfo.CurrentCulture,
+			base.ErrorMessageString,
+			name,
+			OtherProperty);
+	}
+	
+	protected override ValidationResult IsValid(
+	object value, ValidationContext validationContext) {
+		// Implementation comes here
+	}
+}
+
+
+
+[GreaterThan("SalesStartsAt")]
+public DateTime SalesEndsAt { get; set; }
+
+```
+
+### IValidatableObject Custom Validation
+```cs
+
+
+public class Car : IValidatableObject {
+	public int Id { get; set; }
+	[Required]
+	public string Make { get; set; }
+	
+	public int Year { get; set; }
+	
+	public float Price { get; set; }
+	public IEnumerable<ValidationResult> Validate(
+		ValidationContext validationContext) {
+	
+		if (Year < 2010 && Price > 250000F) {
+			yield return new ValidationResult(
+				"The Price cannot be above 250000 if the Year value is lower than 2010.", 	new string[] { "Price" });
+		}
+		
+		yield return ValidationResult.Success;
+	}
+}
+
+```
+
+
+
 
 ## Dependency Resolution
 ## Testing
