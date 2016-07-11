@@ -1398,7 +1398,358 @@ public class Car : IValidatableObject {
 
 
 ## Dependency Resolution
+```cs
+// a tax calculator implementing ITaxCalculator
+// using constructor injection
+public class TaxCalculator : ITaxCalculator
+{
+	private readonly ITaxConfiguration _configuration;
+	public TaxCalculator(ITaxConfiguration configuration)
+	{
+		_configuration = configuration;
+	}
+	// ... rest of the implementation
+}
+
+
+
+// registering ITaxCalculator in AutoFac
+var builder = new ContainerBuilder();
+builder.RegisterType<TaxCalculator>().As<ITaxCalculator>();
+var container = builder.Build(); // 2-stage DI exclusive to AutoFac
+
+
+Service Locator
+// Service Locator pattern in AutoFac
+var taxCalculator = container.Resolve<ITaxCalculator>();
+```
 ## Testing
+### Testing Actions Not Dependent on the Controller
+```cs
+[Fact]
+public void GetAll_should_return_all_from_OrderService()
+{
+	// arrange
+	var orders = new Order[0];
+	var mockOrderService = new Mock<IOrderService>();
+	mockOrderService.Setup(x => x.GetAll())
+	.Returns(orders);
+	var orderController = new OrderController(mockOrderService.Object);
+	// act
+	var result = orderController.Get();
+	// assert
+	Assert.Equal(orders, result);
+}
+```
+
+### Testing Getting an Existing Order Without Preparing the Request Context (Causes Exception)
+```cs
+[Fact]
+public void Get_should_return_OK_if_order_exists()
+{
+	// arrange
+	const int OrderId = 123;
+	var order = new Order()
+	{
+		Id = OrderId
+	};
+	var mockOrderService = new Mock<IOrderService>();
+	mockOrderService.Setup(x => x.Exists(It.IsAny<int>()))
+	.Returns(true);
+	mockOrderService.Setup(x => x.Get(It.IsAny<int>()))
+	.Returns(order);
+	
+	var orderController = new OrderController(mockOrderService.Object);
+	// act
+	var result = orderController.Get(new HttpRequestMessage(), OrderId);
+	// assert
+	Assert.Equal(HttpStatusCode.OK, result.StatusCode);
+}
+```
+
+### Testing Getting a Nonexisting Order
+```cs
+[Fact]
+public void Get_should_return_NotFound_if_order_DoesNotExistS()
+{
+	// arrange
+	const int OrderId = 123;
+	var mockOrderService = new Mock<IOrderService>();
+	mockOrderService.Setup(x => x.Exists(It.IsAny<int>()))
+	.Returns(false);
+	var orderController = new OrderController(mockOrderService.Object);
+	var request = new HttpRequestMessage();
+	request.Properties[HttpPropertyKeys.HttpConfigurationKey] = new HttpConfiguration();
+	// act
+	var result = orderController.Get(request, OrderId);
+	// assert
+	Assert.Equal(HttpStatusCode.NotFound, result.StatusCode);
+}
+```
+
+### Testing HTTP Status Code for a Valid Order Without Preparing Controller Contex
+```cs
+[Fact]
+public void Post_should_return_Created_if_order_good()
+{
+	// arrange
+	const int OrderId = 123;
+	var order = new Order(new OrderItem[]
+		{
+			new OrderItem()
+				{
+					Name = "Name",
+					Quantity = 1
+				}
+			})
+		{
+			Id = OrderId
+		};
+		
+	var mockOrderService = new Mock<IOrderService>();
+	mockOrderService.Setup(x => x.Exists(It.IsAny<int>()))
+	.Returns(false);
+	
+	var orderController = new OrderController(mockOrderService.Object);
+	var request = new HttpRequestMessage();
+	
+	request.Properties[HttpPropertyKeys.HttpConfigurationKey] = new HttpConfiguration();
+	// act
+	var result = orderController.Post(request, order);
+	// assert
+	Assert.Equal(HttpStatusCode.Created, result.StatusCode);
+}
+```
+
+### Testing HTTP Status Code for a Valid Order Without Preparing Controller Context
+```cs
+[Fact]
+public void Post_should_return_Created_if_order_good()
+{
+	// arrange
+	const int OrderId = 123;
+	var order = new Order(new OrderItem[]
+			{
+				new OrderItem()
+					{
+						Name = "Name",
+						Quantity = 1
+					}
+				})
+		{
+			Id = OrderId
+		};
+		
+	var mockOrderService = new Mock<IOrderService>();
+	mockOrderService.Setup(x => x.Exists(It.IsAny<int>()))
+	.Returns(false);
+	var orderController = new OrderController(mockOrderService.Object);
+	var request = new HttpRequestMessage(HttpMethod.Post, "http://localhost:2345/api/Order/");
+	var config = new HttpConfiguration();
+	request.Properties[HttpPropertyKeys.HttpConfigurationKey] = config;
+	orderController.Request = request;
+	orderController.Configuration = config;
+	config.Routes.MapHttpRoute("DefaultApi", "api/{controller}/{id}", _
+	new {id = RouteParameter.Optional});
+	var route = config.Routes["DefaultApi"];
+	var httpRouteData = new HttpRouteData(route, new HttpRouteValueDictionary( _
+	new {controller = "Order" }));
+	orderController.Request.Properties[HttpPropertyKeys.HttpRouteDataKey] = httpRouteData;
+	// act
+	var result = orderController.Post(request, order);
+	// assert
+	Assert.Equal(HttpStatusCode.Created, result.StatusCode);
+}
+```
+
+### Using the Data Builder’s Fluent API to Set Up the Controller Context
+```cs
+[Fact]
+public void Post_should_return_Created_if_order_good_fluentApi()
+{
+	// arrange
+	const int OrderId = 123;
+	var order = new Order(new OrderItem[]
+			{
+				new OrderItem()
+					{
+						Name = "Name",
+						Quantity = 1
+					}
+				})
+		{
+		Id = OrderId
+		};
+	var mockOrderService = new Mock<IOrderService>();
+	mockOrderService.Setup(x => x.Exists(It.IsAny<int>()))
+	.Returns(false);
+
+	var orderController = ControllerContextSetup
+	.Of(() => new OrderController(mockOrderService.Object))
+	.WithDefaultConfig()
+	.WithDefaultRoute()
+	.Requesting("http://localhost:2345/api/Order/")
+	.WithRouteData(new {controller="Order"})
+	.Build<OrderController>();
+	
+	// act
+	var result = orderController.Post(orderController.Request, order);
+	// assert
+	Assert.Equal(HttpStatusCode.Created, result.StatusCode);
+}
+```
+
+
+### Data-Driven Cases for Testing Routing
+```cs
+[Theory]
+[InlineData("http://localhost:12345/foo/route", "GET", false, null, null)]
+[InlineData("http://localhost:12345/api/order/", "GET", true, "order", null)]
+[InlineData("http://localhost:12345/api/order/123", "GET", true, "order", "123")]
+
+public void DefaultRoute_Returns_Correct_RouteData(
+string url, string method, bool shouldfound, string controller, string id)
+{
+	// arrange
+	var config = new HttpConfiguration();
+	WebApiConfig.Register(config);
+	var request = new HttpRequestMessage(new HttpMethod(method), url);
+	
+	// act
+	var routeData = config.Routes.GetRouteData(request);
+	
+	// assert
+	Assert.Equal(shouldfound, routeData!=null);
+	if (shouldfound)
+	{
+		Assert.Equal(controller, routeData.Values["controller"]);
+		Assert.Equal(id == null ? (object) RouteParameter.Optional : (object)id, routeData.	Values["id"]);
+	}
+}
+```
+
+### Testing Controller and Action Selection
+```cs
+//Data-Driven Cases for Checking Controller and Action Selection
+[Theory]
+[InlineData("http://localhost:12345/api/order/123", "GET", typeof(OrderController), "Get")]
+[InlineData("http://localhost:12345/api/order", "POST", typeof(OrderController), "Post")]
+[InlineData("http://localhost:12345/api/order/123", "PUT", typeof(OrderController), "Put")]
+[InlineData("http://localhost:12345/api/order", "GET", typeof(OrderController), "Get")]
+[InlineData("http://localhost:12345/api/order/123/OrderItem", "GET", typeof(OrderItemController),
+"GetItems")]
+public void Ensure_Correct_Controller_and_Action_Selected(
+string url,
+string method,
+Type controllerType,
+string actionName)
+{
+	// arrange
+	var config = new HttpConfiguration();
+	WebApiConfig.Register(config);
+	var actionSelector = config.Services.GetActionSelector();
+	var controllerSelector = config.Services.GetHttpControllerSelector();
+	var request = new HttpRequestMessage(new HttpMethod(method), url);
+	var routeData = config.Routes.GetRouteData(request);
+	request.Properties[HttpPropertyKeys.HttpRouteDataKey] = routeData;
+	request.Properties[HttpPropertyKeys.HttpConfigurationKey] = config;
+	
+	// act
+	var controllerDescriptor = controllerSelector.SelectController(request);
+	var context = new HttpControllerContext(config, routeData, request)
+	{
+		ControllerDescriptor = controllerDescriptor
+	};
+	
+	var actionDescriptor = actionSelector.SelectAction(context);
+	// assert
+	Assert.Equal(controllerType, controllerDescriptor.ControllerType);
+	Assert.Equal(actionName, actionDescriptor.ActionName);
+}
+```
+
+### Testing Filters
+```cs
+//ValidateModelStateAttribute Filter
+[AttributeUsage( AttributeTargets.Class | AttributeTargets.Method,
+AllowMultiple = false, Inherited = true)]
+public class ValidateModelStateAttribute : ActionFilterAttribute {
+	public override void OnActionExecuting(
+		HttpActionContext actionContext) {
+		
+	if (!actionContext.ModelState.IsValid) {
+		actionContext.Response =
+		actionContext.Request.CreateErrorResponse(
+			HttpStatusCode.BadRequest,
+			actionContext.ModelState);
+		}
+	}
+}
+
+//Testing ValidateModelStateAttribute Filter
+
+[Fact]
+public void Should_Return_BadRequest_If_ModelState_Invalid()
+{
+	// arrange
+	var filter = new ValidateModelStateAttribute();
+	var context = new HttpActionContext(
+		new HttpControllerContext(new HttpConfiguration(),
+			new HttpRouteData(new HttpRoute("SomePattern")),
+			new HttpRequestMessage()),
+			new ReflectedHttpActionDescriptor());
+	
+	context.ModelState.AddModelError("foo", "some error");
+	
+	// act
+	filter.OnActionExecuting(context);
+	
+	// assert
+	Assert.NotNull(context.Response);
+	Assert.Equal(HttpStatusCode.BadRequest, context.Response.StatusCode);
+}
+```
+
+### Integration Testing
+```cs
+//Writing Multiple Assertions in SubSpec
+
+[Specification]
+public void GetAll_should_return_all_from_OrderService_Subspec()
+{
+	var orders = default(Order[]);
+	var mockOrderService = default(Mock<IOrderService>);
+	var orderController = default(OrderController);
+	var result = default(IEnumerable<Order>);
+	
+	"Given order service contains no orders"
+		.Context(() =>
+			{
+				orders = new Order[0];
+				mockOrderService = new Mock<IOrderService>();
+				orderController = new OrderController(mockOrderService.Object);
+				mockOrderService.Setup(x => x.GetAll())
+					.Returns(orders);
+			});
+	
+	"When I ask for all orders from orderController"
+		.Do(() =>
+			{
+				result = orderController.Get();
+			});
+	
+	"Then it must not be null"
+		.Observation(() =>
+			{
+				Assert.NotNull(result);
+			});
+	"And it should contain no order"
+		.Observation(() =>
+			{
+				Assert.Empty(result);
+			});
+}
+```
 ## Optimization and Performance
 ## Hosting
 
