@@ -867,6 +867,99 @@ public class Operation {
 ```
 
 ## Message Handlers
+
+### Registering the Message Handlers
+```cs
+public static class WebApiConfig
+{
+	public static void Register(HttpConfiguration config)
+	{
+		config.MessageHandlers.Add(new MyImportantHandler());
+		config.MessageHandlers.Add(new MyNotSoImportantHandler());
+	}
+}
+```
+
+
+### Registering the Per-Route Handlers
+```cs
+public static class WebApiConfig
+{
+	public static void Register(HttpConfiguration config)
+	{
+		var handler = new MyImportantHandler()
+		{
+			InnerHandler = new MyNotSoImportantHandler()
+			{
+				InnerHandler = new HttpControllerDispatcher(config)
+			}
+		};
+		config.Routes.MapHttpRoute(
+			name: "premiumApi",
+			routeTemplate: "premium/{controller}/{id}",
+			defaults: new { id = RouteParameter.Optional },
+			constraints: null,
+			handler: handler
+			);
+
+	}
+}
+```
+
+### Creating a Controller Selector for Versioning
+```cs
+using System.Web.Http.Dispatcher;
+public class MyControllerSelector : DefaultHttpControllerSelector
+{
+	public MyControllerSelector(HttpConfiguration configuration) : base(configuration) {}
+	public override string GetControllerName(HttpRequestMessage request)
+	{
+		string controllerName = base.GetControllerName(request);
+		
+		// Having controllers like EmployeesV2Controller or EmployeesV3Controller is
+		// our internal business. A client must not make a request directly like /api/employeesv2.
+		int version;
+		int length = controllerName.Length;
+		if (Int32.TryParse(controllerName.Substring(length - 1, 1), out version))
+		{
+			if (controllerName.Substring(length - 2, 1).Equals("V", StringComparison.OrdinalIgnoreCase))
+			{
+				string message = "No HTTP resource was found that matches the request URI {0}";
+				throw new HttpResponseException(
+				request.CreateErrorResponse(
+				HttpStatusCode.NotFound,
+				String.Format(message, request.RequestUri)));
+			}
+		}
+
+		
+		// If client requests a specific version through the request header, we entertain it
+		if (request.Headers.Contains("X-Version"))
+		{
+			string headerValue = request.Headers.GetValues("X-Version").First();
+			if (!String.IsNullOrEmpty(headerValue) &&
+			Int32.TryParse(headerValue, out version))
+			{
+				controllerName = String.Format("{0}v{1}", controllerName, version);
+				HttpControllerDescriptor descriptor = null;
+				if (!this.GetControllerMapping().TryGetValue(controllerName, out descriptor))
+				{
+					string message = "No HTTP resource was found that matches the request URI {0} and version {1}";
+					throw new HttpResponseException(
+					request.CreateErrorResponse(
+					HttpStatusCode.NotFound,
+					String.Format(message, request.RequestUri, version)));
+				}
+			}
+		}
+
+		return controllerName;
+	}
+}
+
+http://localhost:39188/api/employeesv2/1.
+```
+
 ### HttpMessageHandler Abstract Base Class Implementation
 ```cs
 namespace System.Net.Http
