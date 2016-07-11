@@ -1,7 +1,9 @@
 # WebAPI
 
 # TOC
-
+* [Getting an Employee the WCF Way](#getting-an-employee-the-wcf-way)
+* [Getting an Employee the ASP.NET Web API Way](#getting-an-employee-the-aspnet-web-api-way)
+* [Simple REST API](#simple-rest-api)
 * [Routing](#routing)
 * [Controllers](#controllers )
 * [Actions](#actions)
@@ -260,6 +262,72 @@ protected void Application_Start(object sender, EventArgs e) {
 
 
 ## Controllers
+
+
+### Controller Sample
+
+public class CarsController : ApiController {
+	private readonly CarsContext _carsCtx = new CarsContext();
+	
+	//NonActionAttribute
+	[NonAction]
+	public string[] GetCars() {
+		return new string[] {
+		"Car 1",
+		"Car 2",
+		"Car 3"
+		};
+	}
+
+	//Get Action
+	public IEnumerable<Car> Get() {
+		var cars = _carsCtx.All;
+		
+		HttpResponseMessage response =
+		Request.CreateResponse<string[]>(HttpStatusCode.OK, cars);
+		response.Headers.Add("X-Foo", "Bar");
+		return response;
+	}
+	
+	//Get Action
+	public Car GetCar(int id) {
+		var carTuple = _carsCtx.GetSingle(id);
+
+		if (!carTuple.Item1) {
+			var response = 	Request.CreateResponse(HttpStatusCode.NotFound);
+			throw new HttpResponseException(response);
+		}
+		return carTuple.Item2;
+	}
+
+
+	//Post Action
+	public HttpResponseMessage PostCar(Car car) {
+		var createdCar = _carsCtx.Add(car);
+		var response = Request.CreateResponse(HttpStatusCode.Created, createdCar);
+		response.Headers.Location = new Uri(Url.Link("DefaultHttpRoute", new {	id = createdCar.Id }));
+		return response;
+	}
+	
+	//Put Action
+	public Car PutCar(int id, Car car) {
+		car.Id = id;
+		if (!_carsCtx.TryUpdate(car)) {
+			return new HttpResponseMessage(HttpStatusCode.NotFound);
+		}
+		return car;
+	}
+	
+	//Delete Action Method
+	public HttpResponseMessage DeleteCar(int id) {
+		if (!_carsCtx.TryRemove(id)) {
+			return new HttpResponseMessage(HttpStatusCode.NotFound);
+		}
+		return Request.CreateResponse(HttpStatusCode.OK);
+	}
+}
+
+
 ```cs
 //Defining a Common Prefix
 [RoutePrefix("api/today")]
@@ -287,37 +355,7 @@ public class CustomController : ApiController {
 }
 ```
 
-### Returning a Response Message
-```cs
-public class CarsController : ApiController {
-	public HttpResponseMessage DeleteCar(int id) {
-		//Check here if the resource exists
-		if (id != 1) {
-			return new HttpResponseMessage(HttpStatusCode.NotFound);
-		}
-		
-		//Delete the car object here
-		var response = new HttpResponseMessage(HttpStatusCode.OK);
-		return response;
-	}
-}
-```
 
-### PostCar Controller Action That Returns an HttpResponseMessage Instance with an Object
-```cs
-public class CarsController : ApiController {
-	public HttpResponseMessage GetCars() {
-		var cars = new string[] {
-			"Car 1",
-			"Car 2",
-			"Car 3"
-		};
-	HttpResponseMessage response = 	Request.CreateResponse<string[]>(HttpStatusCode.OK, cars);
-	response.Headers.Add("X-Foo", "Bar");
-	return response;
-	}
-}
-```
 
 ### A Sample Controller Action That Throws HttpResponseException
 ```cs
@@ -344,7 +382,6 @@ public class CarsController : ApiController {
 }
 
 ```
-
 
 
 ### Retrieval of Employees by Department
