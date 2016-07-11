@@ -12,6 +12,7 @@
 * [Input Validation](#input-validation)
 * [Dependency Resolution](#dependency-resolution)
 * [Testing](#testing)
+* [Securing the Service](securing-the-service)
 * [Optimization and Performance](#optimization-and-performance)
 * [Hosting](#hosting)
 * [Error Handling](#error-handling)
@@ -630,12 +631,121 @@ public class RsvpController : ApiController {
 }		
 ```
 
-## Secure
+## Securing the Service
 ```cs
 //Applying Authorization in the ProductsController.cs File
 [Authorize(Roles = "Administrators")]
 public async Task DeleteProduct(int id) {
 	await Repository.DeleteProductAsync(id);
+}
+```
+
+
+### The Authorization Filter
+```cs
+
+[Route("", Name = "AddTaskRoute")]
+[HttpPost]
+[Authorize(Roles = Constants.RoleNames.Manager)]
+public IHttpActionResult AddTask(HttpRequestMessage requestMessage, NewTask newTask)
+{
+	var task = _addTaskMaintenanceProcessor.AddTask(newTask);
+	var result = new TaskCreatedActionResult(requestMessage, task);
+	return result;
+}
+```
+
+### A Message Handler to Support HTTP Basic Authentication
+```cs
+
+//IBasicSecurityService.cs
+public interface IBasicSecurityService
+{
+	bool SetPrincipal(string username, string password);
+}
+
+//BasicSecurityService.cs
+public class BasicSecurityService : IBasicSecurityService
+{
+	public virtual IPrincipal GetPrincipal(User user)
+	{
+		var identity = new GenericIdentity(user.Username, Constants.SchemeTypes.Basic);
+		identity.AddClaim(new Claim(ClaimTypes.GivenName, user.Firstname));
+		identity.AddClaim(new Claim(ClaimTypes.Surname, user.Lastname));
+		var username = user.Username.ToLowerInvariant();
+		
+		switch (username)
+		{
+		case "bhogg":
+			identity.AddClaim(new Claim(ClaimTypes.Role, Constants.RoleNames.Manager));
+			identity.AddClaim(new Claim(ClaimTypes.Role, Constants.RoleNames.SeniorWorker));
+			identity.AddClaim(new Claim(ClaimTypes.Role, Constants.RoleNames.JuniorWorker));
+			break;
+		case "jbob":
+			identity.AddClaim(new Claim(ClaimTypes.Role, Constants.RoleNames.SeniorWorker));
+			identity.AddClaim(new Claim(ClaimTypes.Role, Constants.RoleNames.JuniorWorker));
+			break;
+		case "jdoe":
+			identity.AddClaim(new Claim(ClaimTypes.Role, Constants.RoleNames.JuniorWorker));
+			break;
+		default:
+			return null;
+		}
+		return new ClaimsPrincipal(identity);
+	}
+}
+```
+
+### Auditing
+```cs
+public class UserAuditAttribute : ActionFilterAttribute
+{
+	private readonly ILog _log;
+	private readonly IUserSession _userSession;
+	public UserAuditAttribute()
+	: this(WebContainerManager.Get<ILogManager>(), WebContainerManager.Get<IUserSession>())
+	{
+	}
+	public UserAuditAttribute(ILogManager logManager, IUserSession userSession)
+	{
+		_userSession = userSession;
+		_log = logManager.GetLog(typeof (UserAuditAttribute));
+	}
+	public override bool AllowMultiple
+	{
+		get { return false; }
+	}
+	
+	public override Task OnActionExecutingAsync(HttpActionContext actionContext,
+	CancellationToken cancellationToken)
+	{
+		_log.Debug("Starting execution...");
+		var userName = _userSession.Username;
+		return Task.Run(() => AuditCurrentUser(userName), cancellationToken);
+	}
+	
+	public void AuditCurrentUser(string username)
+	{
+		// Simulate long auditing process
+		_log.InfoFormat("Action being executed by user={0}", username);
+		Thread.Sleep(3000);
+	}
+	public override void OnActionExecuted(HttpActionExecutedContext actionExecutedContext)
+	{
+		_log.InfoFormat("Action executed by user={0}", _userSession.Username);
+	}
+}
+```
+
+
+```cs
+[HttpPost]
+[UserAudit]
+[Route("tasks/{taskId:long}/reactivations", Name = "ReactivateTaskRoute")]
+public Task ReactivateTask(long taskId)
+{
+	var task = _reactivateTaskWorkflowProcessor.ReactivateTask(taskId);
+	return task;
 }
 ```
 
@@ -905,6 +1015,14 @@ namespace PartyInvites.Models {
 		[Required]
 		public bool? WillAttend { get; set; }
 	}
+}
+
+
+[ValidateModel]
+public IHttpActionResult AddTask(HttpRequestMessage requestMessage, GuestResponse gr)
+{
+	var task = _processor.GuestResponse(gr);
+	return result;
 }
 
 ```
