@@ -221,7 +221,7 @@ public static class WebApiConfig
 }
 ```
 
-### Our Web API Route Registration
+### Route Registration in ASP.NET Web API with ASP.NET Hosting
 ```cs
 protected void Application_Start(object sender, EventArgs e) {
 	var config = GlobalConfiguration.Configuration;
@@ -232,7 +232,30 @@ protected void Application_Start(object sender, EventArgs e) {
 		"api/{controller}/{id}",
 		new { id = RouteParameter.Optional }
 		);
+	
+	//Sample 2: Sample Route Registration	
+	GlobalConfiguration.Configuration.Routes.MapHttpRoute(
+		"DefaultHttpRoute",
+		"api/{controller}/{id}",
+		new { id = RouteParameter.Optional }
+		);	
+		
+	//Having Multiple Web API Routes	
+	var routes1 = GlobalConfiguration.Configuration.Routes;
+		routes.MapHttpRoute(
+		"DefaultHttpRoute",
+		"api/{controller}/{id}",
+		new { id = RouteParameter.Optional }
+		);
+		
+	routes1.MapHttpRoute(
+		"VehicleHttpRoute",
+		"api/{vehicletype}/{controller}",
+		defaults: new { },
+		constraints: new { controller = "^vehicles$" }
+		);
 }
+
 ```
 
 
