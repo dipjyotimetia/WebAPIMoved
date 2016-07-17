@@ -20,8 +20,7 @@
 * [Error Handling](#error-handling)
 * [Tracing and Logging](#Tracing-and-Logging)
 * [API Documentation](#api-documentation)
-
-
+* [Useful URL](#useful-url)
 
 
 ## Getting an Employee the WCF Way
@@ -2706,3 +2705,7 @@ public Product Get(int id) {
 ```
 ## Tracing and Logging
 ## API Documentation
+
+## Useful URL
+* [HTTP Message Lifecycle](http://www.asp.net/media/4071077/aspnet-web-api-poster.pdf)
+* [Intro to Application Pools in IIS](http://geekswithblogs.net/JeremyMorgan/archive/2016/07/09/introduction-to-application-pools-in-iis.aspx)
