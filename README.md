@@ -2709,4 +2709,4 @@ public Product Get(int id) {
 ## Useful URL
 * [HTTP Message Lifecycle](http://www.asp.net/media/4071077/aspnet-web-api-poster.pdf)
 * [Intro to Application Pools in IIS](http://geekswithblogs.net/JeremyMorgan/archive/2016/07/09/introduction-to-application-pools-in-iis.aspx)
-* [Dependency injection in ASP.NET Core)(http://gunnarpeipman.com/2016/07/using-dependency-injection-with-view-components/)
+* [Securing ASP.NET Web API](http://code.tutsplus.com/tutorials/securing-aspnet-web-api--cms-26012)
